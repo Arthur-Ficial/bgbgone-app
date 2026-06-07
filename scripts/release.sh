@@ -47,9 +47,13 @@ publish_appcast() {
     local gen; gen="$(resolve_generate_appcast)" || return 1
     local staging; staging="$(mktemp -d)"
     cp "$APP_ZIP" "$staging/"
-    # Versions/signatures come from the app bundle inside the zip; signing key is the
-    # EdDSA private key in the login Keychain (apple/bgbgone-sparkle-ed-private in pass).
-    "$gen" --download-url-prefix "https://github.com/Arthur-Ficial/${APP_NAME}/releases/download/${TAG}/" "$staging"
+    # Versions/signatures come from the app bundle inside the zip. Feed the EdDSA private
+    # key from pass via stdin (--ed-key-file -) rather than the Keychain, which isn't
+    # reliably reachable from a non-interactive shell (errSecUserCanceled / -128).
+    pass show apple/bgbgone-sparkle-ed-private \
+        | "$gen" --ed-key-file - \
+            --download-url-prefix "https://github.com/Arthur-Ficial/${APP_NAME}/releases/download/${TAG}/" \
+            "$staging"
     local appcast="$staging/appcast.xml"
     [[ -f "$appcast" ]] || { print "ERROR: appcast.xml not generated" >&2; rm -rf "$staging"; return 1; }
 
