@@ -154,6 +154,7 @@ struct FileListView: View {
             }
             .controlSize(.small)
             .padding(.top, 4)
+            .accessibilityIdentifier("empty.tryDemo")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.background)
@@ -196,6 +197,7 @@ struct FileListView: View {
                 viewModel.startProcessing(ids: ids)
             }
             .disabled(viewModel.activeRun != nil)
+            .accessibilityIdentifier("ctx.processThisOnly")
             Divider()
 
             ForEach(actions) { action in
@@ -220,6 +222,7 @@ struct FileListView: View {
             handle(action, selection: selection)
         }
         .disabled(!action.isEnabled)
+        .accessibilityIdentifier("ctx.\(action.kind)")
     }
 
     private func systemImage(for kind: FileRowActions.Kind) -> String {

@@ -50,4 +50,15 @@ struct CharterUIRulesTests {
         let code = try Self.code(of: "Config.swift")
         #expect(!code.contains("VNGenerate"), "help text must not expose VNGenerate* API names")
     }
+
+    /// Primary interactive controls must carry accessibilityIdentifiers (audit Item 0 —
+    /// none existed) so assistive tech and e2e automation can target them.
+    @Test func primaryControlsHaveAccessibilityIdentifiers() throws {
+        let code = try Self.allCode()
+        for id in ["toolbar.addFiles", "toolbar.runAll", "toolbar.inspectorToggle",
+                   "config.background", "config.format", "config.algorithm",
+                   "config.colour", "empty.tryDemo", "ctx.processThisOnly"] {
+            #expect(code.contains("\"\(id)\""), "missing accessibilityIdentifier \"\(id)\"")
+        }
+    }
 }

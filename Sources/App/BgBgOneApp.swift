@@ -193,6 +193,7 @@ struct ContentView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Button("Add Files…", systemImage: "plus", action: addFiles)
                         .help("Add image files to the queue")
+                        .accessibilityIdentifier("toolbar.addFiles")
                 }
                 // "Run all" — visible whenever there are files. Always runs
                 // EVERY file with the current Inspector settings (re-runs
@@ -210,6 +211,7 @@ struct ContentView: View {
                         .help(viewModel.activeRun != nil
                               ? "Stop the running batch"
                               : "Apply the current Inspector settings to every image and process them all")
+                        .accessibilityIdentifier("toolbar.runAll")
                     }
                 }
                 ToolbarItem(placement: .primaryAction) {
@@ -218,6 +220,7 @@ struct ContentView: View {
                         systemImage: "sidebar.right"
                     ) { isInspectorPresented.toggle() }
                     .help(isInspectorPresented ? "Hide inspector" : "Show inspector")
+                    .accessibilityIdentifier("toolbar.inspectorToggle")
                 }
             }
         }

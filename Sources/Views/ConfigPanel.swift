@@ -24,11 +24,13 @@ struct ConfigPanel: View {
                         .pickerStyle(.segmented)
                         .labelsHidden()
                         .fixedSize()
+                        .accessibilityIdentifier("config.background")
                         Spacer(minLength: 0)
                     }
 
                     if case .color = config.background {
                         ColorPicker("Colour", selection: $colourBinding, supportsOpacity: false)
+                            .accessibilityIdentifier("config.colour")
                             .onChange(of: colourBinding) { _, new in
                                 config.background = .color(hex: new.toHex() ?? "#ffffff")
                             }
@@ -56,6 +58,7 @@ struct ConfigPanel: View {
                     .pickerStyle(.segmented)
                     .labelsHidden()
                     .fixedSize()
+                    .accessibilityIdentifier("config.format")
                     Spacer(minLength: 0)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -71,6 +74,7 @@ struct ConfigPanel: View {
                     .pickerStyle(.segmented)
                     .labelsHidden()
                     .fixedSize()
+                    .accessibilityIdentifier("config.algorithm")
                     Spacer(minLength: 0)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
