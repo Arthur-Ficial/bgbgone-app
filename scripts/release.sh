@@ -80,6 +80,28 @@ publish_appcast() {
     print "==> Appcast published → https://arthur-ficial.github.io/${APP_NAME}/appcast.xml"
 }
 
+# Refresh the landing page's "Download for macOS" version label to this release and
+# redeploy it. The download LINK already uses GitHub's /releases/latest/ permalink, so
+# it tracks new releases on its own; this just keeps the visible version text current.
+# Best-effort: a missing/uncooperative web repo never fails the app release.
+update_landing_page() {
+    local web="$ROOT_DIR/../bgbgone-web"
+    [[ -d "$web/.git" && -x "$web/scripts/sync-app-version.sh" ]] || {
+        print "==> bgbgone-web not present locally — skipping landing-page version sync"; return 0; }
+    print "==> Updating landing-page download version (bgbgone-web)"
+    bash "$web/scripts/sync-app-version.sh" || return 0
+    if git -C "$web" diff --quiet -- index.html; then
+        print "==> Landing page already advertises ${TAG}"; return 0
+    fi
+    git -C "$web" add index.html
+    git -C "$web" -c user.name="Arthur Ficial" -c user.email="arti.ficial@fullstackoptimization.com" \
+        commit -q -m "landing: bump Mac app download to ${TAG}"
+    git -C "$web" push -q origin main || true
+    ( cd "$web" && make deploy >/dev/null 2>&1 ) \
+        && print "==> Landing page redeployed with ${TAG}" \
+        || print "==> Landing-page deploy skipped/failed (non-fatal)"
+}
+
 print "==> Release $TAG${DRY_RUN:+ (DRY RUN)}"
 
 BRANCH="$(git -C "$ROOT_DIR" rev-parse --abbrev-ref HEAD)"
@@ -193,5 +215,8 @@ fi
 
 print "==> Publishing Sparkle appcast"
 publish_appcast
+
+print "==> Syncing landing-page download version"
+update_landing_page
 
 print "==> Done. https://github.com/Arthur-Ficial/bgbgone-app/releases/tag/$TAG"
