@@ -21,6 +21,61 @@ SIGN_IDENTITY="${SIGN_IDENTITY:-Developer ID Application: Franz Enzenhofer (7D2Y
 KEYCHAIN_PROFILE="${KEYCHAIN_PROFILE:-notarytool}"
 ENTITLEMENTS="${ENTITLEMENTS:-$ROOT_DIR/bgbgone-app.entitlements}"
 
+# --- Sparkle appcast publishing -------------------------------------------------
+SPARKLE_VERSION="2.9.2"
+SPARKLE_DIST="$ROOT_DIR/.build/sparkle-dist"
+
+# Locate generate_appcast (Sparkle's signing/appcast tool); fetch the distribution
+# tarball on demand if it isn't already cached under .build/.
+resolve_generate_appcast() {
+    local tool="$SPARKLE_DIST/bin/generate_appcast"
+    if [[ ! -x "$tool" ]]; then
+        print "==> Fetching Sparkle ${SPARKLE_VERSION} tools" >&2
+        mkdir -p "$SPARKLE_DIST"
+        curl -fsSL -o "$SPARKLE_DIST/Sparkle.tar.xz" \
+            "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz" >&2
+        tar -xf "$SPARKLE_DIST/Sparkle.tar.xz" -C "$SPARKLE_DIST" >&2
+    fi
+    [[ -x "$tool" ]] || { print "error: generate_appcast not found" >&2; return 1; }
+    print -- "$tool"
+}
+
+# Generate the EdDSA-signed appcast for this release and publish it to the gh-pages
+# branch (served at SUFeedURL). Run AFTER `gh release create` so the enclosure URLs
+# resolve to the just-uploaded GitHub Release assets.
+publish_appcast() {
+    local gen; gen="$(resolve_generate_appcast)" || return 1
+    local staging; staging="$(mktemp -d)"
+    cp "$APP_ZIP" "$staging/"
+    # Versions/signatures come from the app bundle inside the zip; signing key is the
+    # EdDSA private key in the login Keychain (apple/bgbgone-sparkle-ed-private in pass).
+    "$gen" --download-url-prefix "https://github.com/Arthur-Ficial/${APP_NAME}/releases/download/${TAG}/" "$staging"
+    local appcast="$staging/appcast.xml"
+    [[ -f "$appcast" ]] || { print "ERROR: appcast.xml not generated" >&2; rm -rf "$staging"; return 1; }
+
+    local pages; pages="$(mktemp -d)"
+    local remote; remote="$(git -C "$ROOT_DIR" remote get-url origin)"
+    git clone --quiet "$remote" "$pages"
+    if git -C "$pages" rev-parse --verify origin/gh-pages >/dev/null 2>&1; then
+        git -C "$pages" checkout --quiet gh-pages
+    else
+        git -C "$pages" checkout --quiet --orphan gh-pages
+        git -C "$pages" rm -rqf . >/dev/null 2>&1 || true
+    fi
+    cp "$appcast" "$pages/appcast.xml"
+    git -C "$pages" add appcast.xml
+    git -C "$pages" -c user.name="Arthur Ficial" -c user.email="arti.ficial@fullstackoptimization.com" \
+        commit -q -m "appcast: ${TAG}"
+    git -C "$pages" push --quiet origin gh-pages
+    rm -rf "$pages" "$staging"
+
+    # Enable GitHub Pages from gh-pages (idempotent; needs the branch to exist first).
+    gh api "repos/Arthur-Ficial/${APP_NAME}/pages" >/dev/null 2>&1 || \
+        gh api "repos/Arthur-Ficial/${APP_NAME}/pages" -X POST \
+            -f 'source[branch]=gh-pages' -f 'source[path]=/' >/dev/null 2>&1 || true
+    print "==> Appcast published → https://arthur-ficial.github.io/${APP_NAME}/appcast.xml"
+}
+
 print "==> Release $TAG${DRY_RUN:+ (DRY RUN)}"
 
 BRANCH="$(git -C "$ROOT_DIR" rev-parse --abbrev-ref HEAD)"
@@ -131,5 +186,8 @@ else
         -f message="cask: add ${APP_NAME} ${TAG}" \
         -f content="$CASK_B64" --jq '.commit.sha' > /dev/null
 fi
+
+print "==> Publishing Sparkle appcast"
+publish_appcast
 
 print "==> Done. https://github.com/Arthur-Ficial/bgbgone-app/releases/tag/$TAG"

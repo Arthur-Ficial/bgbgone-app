@@ -22,6 +22,19 @@ ENTITLEMENTS="${ENTITLEMENTS:-$ROOT_DIR/bgbgone-app.entitlements}"
 BGBGONE_VERSION="1.2.23"
 SUBMODULE_DIR="$ROOT_DIR/vendor/bgbgone"
 
+# Sparkle auto-update framework, embedded at Contents/Frameworks/Sparkle.framework.
+# Resolved from the SwiftPM-downloaded XCFramework (the exact build the app links
+# against), with the downloaded distribution tarball as a fallback.
+SPARKLE_VERSION="2.9.2"
+resolve_sparkle_framework() {
+    local fw
+    fw="$(/usr/bin/find "$ROOT_DIR/build/artifacts" -type d -path '*Sparkle.xcframework/macos*/Sparkle.framework' 2>/dev/null | head -1)"
+    [[ -z "$fw" ]] && fw="$(/usr/bin/find "$ROOT_DIR/.build" -type d -path '*Sparkle.xcframework/macos*/Sparkle.framework' 2>/dev/null | head -1)"
+    [[ -z "$fw" && -d "$ROOT_DIR/.build/sparkle-dist/Sparkle.framework" ]] && fw="$ROOT_DIR/.build/sparkle-dist/Sparkle.framework"
+    [[ -n "$fw" && -d "$fw" ]] || return 1
+    print -- "$fw"
+}
+
 # Build (or locate) the version-locked bgbgone helper to embed.
 #   1. BGBGONE_HELPER_PATH override — a prebuilt binary (CI cache / cross-build).
 #   2. Otherwise build the pinned vendor/bgbgone submodule from source.
@@ -51,11 +64,30 @@ codesign_path() {
     fi
 }
 
+# Sparkle ships nested code (XPC services + the Updater/Autoupdate helper) inside the
+# framework. Each must be signed inside-out BEFORE the outer app is signed; signing the
+# app alone does not reach them, and notarisation rejects unsigned nested Mach-O.
+sign_sparkle() {
+    local fw="$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
+    [[ -d "$fw" ]] || return 0
+    local V="$fw/Versions/Current"
+    local nested
+    for nested in \
+        "$V/XPCServices/Downloader.xpc" \
+        "$V/XPCServices/Installer.xpc" \
+        "$V/Updater.app" \
+        "$V/Autoupdate"; do
+        [[ -e "$nested" ]] && codesign_path "$nested"
+    done
+    codesign_path "$fw"
+}
+
 sign_bundle() {
     xattr -cr "$APP_BUNDLE" 2>/dev/null || true
     if [[ -x "$APP_BUNDLE/Contents/Helpers/bgbgone" ]]; then
         codesign_path "$APP_BUNDLE/Contents/Helpers/bgbgone"
     fi
+    sign_sparkle
     if [[ -n "$ENTITLEMENTS" && -f "$ENTITLEMENTS" ]]; then
         codesign_path "$APP_BUNDLE" --entitlements "$ENTITLEMENTS"
     else
@@ -78,6 +110,14 @@ cp "$ROOT_DIR/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${VERSION}" "$APP_BUNDLE/Contents/Info.plist" >/dev/null
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" "$APP_BUNDLE/Contents/Info.plist" >/dev/null
+
+# Auto-update guard: a bundled-only app that ships without a feed URL + EdDSA public
+# key would either never update or fail to verify updates. Fail the build, don't ship it.
+for su_key in SUFeedURL SUPublicEDKey; do
+    su_val="$(/usr/libexec/PlistBuddy -c "Print :${su_key}" "$APP_BUNDLE/Contents/Info.plist" 2>/dev/null || true)"
+    [[ -n "$su_val" ]] || { print "error: Info.plist missing ${su_key} — refusing to ship an updater pointed at nothing" >&2; exit 1; }
+done
+print "==> Verified Sparkle Info.plist keys (SUFeedURL, SUPublicEDKey)"
 
 [[ -f "$ICON_SOURCE" ]] && cp "$ICON_SOURCE" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 
@@ -108,6 +148,18 @@ if [[ "$EMBEDDED_VERSION" != *"v${BGBGONE_VERSION}"* ]]; then
     exit 1
 fi
 print "==> Verified embedded bgbgone: ${EMBEDDED_VERSION}"
+
+# Embed Sparkle.framework and point the SwiftPM-built executable at it. The binary
+# references Sparkle via @rpath; without an @executable_path/../Frameworks rpath the
+# dylib won't resolve at runtime inside the .app.
+SPARKLE_FW="$(resolve_sparkle_framework)" || {
+    print "error: Sparkle.framework not found — run 'swift build' first so SwiftPM fetches the XCFramework" >&2
+    exit 1
+}
+print "==> Embedding Sparkle.framework v${SPARKLE_VERSION} from ${SPARKLE_FW}"
+mkdir -p "$APP_BUNDLE/Contents/Frameworks"
+cp -R "$SPARKLE_FW" "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
+install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP_BUNDLE/Contents/MacOS/${APP_NAME}" 2>/dev/null || true
 
 print "==> Signing bundle (${SIGN_IDENTITY})"
 sign_bundle

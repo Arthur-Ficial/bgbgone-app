@@ -13,6 +13,7 @@ extension Notification.Name {
 struct BgBgOneApp: App {
     @NSApplicationDelegateAdaptor(MenuBarPruner.self) private var menuPruner
     @State private var viewModel = AppViewModel()
+    @State private var updater = UpdaterService()
 
     var body: some Scene {
         WindowGroup("bgbgone") {
@@ -21,7 +22,7 @@ struct BgBgOneApp: App {
                 .tint(.accentColor) // charter: inherit the user's chosen Mac accent, never a hardcoded blue
         }
         .windowResizability(.contentMinSize)
-        .commands { BgBgOneCommands(viewModel: viewModel) }
+        .commands { BgBgOneCommands(viewModel: viewModel, updater: updater) }
     }
 }
 
@@ -31,8 +32,18 @@ struct BgBgOneApp: App {
 /// `.commands { }` result-builder limit.
 struct BgBgOneCommands: Commands {
     @Bindable var viewModel: AppViewModel
+    var updater: UpdaterService
 
     var body: some Commands {
+        // -- App menu: "Check for Updates…" sits right under "About", where every
+        // Mac app puts it. Bound to Sparkle via UpdaterService.
+        CommandGroup(after: .appInfo) {
+            Button("Check for Updates…") {
+                updater.checkForUpdates()
+            }
+            .disabled(!updater.canCheckForUpdates)
+        }
+
         // -- File: a single real entry. "Add Files…" with ⌘O wakes the
         // NSOpenPanel via NotificationCenter; the rest of File is killed.
         CommandGroup(replacing: .newItem) {

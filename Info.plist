@@ -26,6 +26,14 @@
     <string>AppIcon</string>
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
+    <!-- Sparkle auto-update. Feed on GitHub Pages; updates EdDSA-verified against
+         SUPublicEDKey (private key in Keychain + pass apple/bgbgone-sparkle-ed-private). -->
+    <key>SUFeedURL</key>
+    <string>https://arthur-ficial.github.io/bgbgone-app/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>nK8voLKHyrgIwf2/a1bb1cbXFd/fJieiw8qNE9SEZiw=</string>
+    <key>SUEnableInstallerLauncherService</key>
+    <false/>
     <key>CFBundleDocumentTypes</key>
     <array>
         <dict>
