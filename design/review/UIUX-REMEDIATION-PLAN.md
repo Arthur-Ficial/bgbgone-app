@@ -1,0 +1,950 @@
+# bgbgone-app — UI/UX Remediation Plan
+
+_Source: multi-agent UI/UX audit (per-surface static review vs Apple HIG + the Finder charter + the design SSOT, live screenshot judging of 24 states, 3-skeptic adversarial verification). Raw findings: `audit-findings-raw.json`._
+
+**330 deduped findings** — 21 blocker, 130 high, 106 medium, 73 low. Verdicts cast: 535 (201 upheld).
+
+## ✅ Already fixed (this pass, TDD + e2e, pushed)
+
+| Theme | Fix | Guard |
+|---|---|---|
+| Stale/flipped CUTOUT preview | `AppViewModel.makeImageFile` no longer blind-probes disk; cutout shows only this-session output | `CutoutPreviewFreshnessTests` |
+| Hardcoded #007aff accent | `.tint(.accentColor)` at root; deleted accent/accentPress/accentSoft | `CharterUIRulesTests.accentIsSystemNotHardcoded` |
+| Debug Tweaks overlay shipped in release | wrapped `DebugOverlay` + mounts in `#if DEBUG` | `…debugOverlayIsDebugGated` |
+| "Install via Homebrew" (false; bundled-only) | reworded MissingBinaryView to reinstall | `…missingBinaryHasNoHomebrewInstruction` |
+| VNGenerate* API names in help text | plain-language algorithm help | `…algorithmHelpTextHasNoVisionAPINames` |
+| Zero accessibilityIdentifiers (Item 0) | annotated toolbar, config pickers, color well, Try Demo, context menu | `…primaryControlsHaveAccessibilityIdentifiers` |
+
+## ⬜ Open findings (by severity)
+
+> Note: many SSOT-drift blockers are because the design SSOT (`design/project/*.jsx/html`) was never updated for the intentional v0.3 feature additions (Run History, filter tree, Algorithm picker). Per charter the SSOT should be brought up to date rather than ripping out shipped v0.3 features — a doc task, tracked here.
+
+### BLOCKER (9)
+
+- **[Drop veil]** Drag veil copy is driven by a hardcoded fake DragHint, never the real payload
+  - rule (charter): Charter: "No fake data… No aspirational labels… Every status string must be derived from real state, not aspiration." SSOT DragHint.veilCopy() exposes five real branches (folders, counts, blocked).
+  - fix: Inspect the real drag payload. Use NSItemProvider / the drop session to classify dragged URLs by UTType (folder vs image vs other) and build a real DragHint, e.g. via a custom DropDelegate (NSView-backed) or by reading providers in a `.onDr
+  - test: both
+- **[Inspector / Config panel]** Inspector shows a deep filter taxonomy that does not exist in the design SSOT
+  - rule (SSOT): Design SSOT is the spec; drift > 3% is a release blocker (charter: 'Any Swift screen must match its HTML counterpart pixel-for-pixel'). The design Config (app.jsx Config(), lines 365-423) defines exactly four rows: Save to, Name as, Backgro
+  - fix: Either bring the inspector back to the four SSOT rows, or update design/project/bgbgone.html + app.jsx to specify the filter taxonomy as the new spec before shipping it. The SSOT and the running app must agree; they currently describe two d
+  - test: both
+- **[Inspector / Config panel (entire Advanced/Filters tree)]** Whole Advanced filter tree (Mask refinement, Foreground transforms, Background filters, Run History) is absent from the design SSOT
+  - rule (SSOT): SSOT is the spec; layout/copy drift > 3% is a release blocker (charter 'Design reference (this is the spec)'). The design Config component (app.jsx Config, lines 365-400) contains ONLY 'Save to', 'Name as', and 'Background' — no Advanced di
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/build/screenshots/audit/14-advanced-foreground-transforms.png`
+  - fix: Either (a) cut the Advanced filter tree to match the SSOT (keep Save to + Name as + Background only), or (b) update design/project/app.jsx to spec the new panel before shipping it. The SSOT and the app cannot diverge by an entire feature tr
+  - test: both
+- **[Inspector / Config panel (entire right column)]** Entire filter inspector is not in the design SSOT — massive spec drift
+  - rule (SSOT): SSOT is the spec; layout/copy/interaction drift > 3% is a release blocker. The design's Config component (design/project/app.jsx lines 365-425) contains exactly four rows: 'Save to', 'Name as', 'Background', 'Format'. There is no Filters he
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/design/project/app.jsx:365`
+  - fix: Either bring the design SSOT up to date with the new filter feature first (the charter says 'add it to the design, then build it'), or remove the unspecified inspector. Per charter §'Design reference', every Swift screen must match its HTML
+  - test: both
+- **[Inspector / Config panel]** Inspector layout diverges massively from the SSOT label/control grid (>3% drift)
+  - rule (SSOT): SSOT is the spec for layout; drift > 3% is a release blocker (charter 'Design reference'; CLAUDE.md line 182).
+  - fix: Re-shape InspectorPane/ConfigPanel to the SSOT: a single LabeledContent/Grid with rows 'Save to', 'Name as', 'Background', 'Format' (in that order) at top level, with the Color-preset swatch row appearing inline only when Color is selected,
+  - test: both
+- **[Inspector / Run History]** Entire Run History feature is absent from the design SSOT
+  - rule (SSOT): Design SSOT is the spec; any Swift screen must match its HTML counterpart, drift > 3% is a release blocker
+  - fix: Either add a Run History state to bgbgone.html and conform the SwiftUI view to it, or remove RunHistoryView from the shipping inspector until the spec exists. Do not ship unspec'd UI.
+  - test: both
+- **[Tweaks panel (debug/demo harness)]** A debug/demo state-switcher panel is rendered in the shipping app
+  - rule (charter): Charter: NO FAKE UI / NO FAKE DATA / no aspirational labels / no app-in-an-app. State must derive from real drag/drop, not a demo radio that fakes phases.
+  - where: `build/screenshots/audit/07-debug-drag-blocked.png`
+  - fix: The Tweaks/demo harness belongs only in design/project/*.jsx. Remove it entirely from Sources/ shipping views; let the real DropMachine FSM drive DropVeil from actual .onDrop hints. No demo radio, no Reset/Mark-all-done, no CLI echo in the 
+  - test: both
+- **[Inspector / Config panel (right pane)]** Entire Inspector panel (Mask refinement, Foreground transforms, Background filters, Advanced filter chain) does not exist in the design SSOT
+  - rule (SSOT): SSOT is the spec for layout/copy/interaction; drift > 3% is a release blocker. The spec's Config component (design/project/app.jsx:365-425) contains ONLY four rows: 'Save to', 'Name as', 'Background', 'Format'. None of the sections shown in
+  - fix: Reconcile spec and implementation. Either update design/project/app.jsx to add these sections as the authoritative spec, or collapse the inspector down to the four spec rows. The implementation cannot be considered conformant while the SSOT
+  - test: both
+- **[Inspector / Config — Advanced section]** Entire Advanced/Mask-refinement config panel is absent from the design SSOT (massive drift)
+  - rule (SSOT): Design SSOT is the spec; drift > 3% is a release blocker (charter: "Any Swift screen must match its HTML counterpart pixel-for-pixel — drift > 3% is a release blocker")
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/design/project/app.jsx`
+  - fix: Either bring the new sections into design/project/app.jsx as the authoritative spec first (the charter requires the design to lead), or remove them from the shipping panel until the SSOT defines them. Do not ship UI surfaces the SSOT has ne
+  - test: both
+
+### HIGH (50)
+
+- **[Drop veil]** Veil card, glyph, and copy have no accessibility label/role — invisible to VoiceOver
+  - rule (a11y): Audit authority #4: every interactive/informative element needs an accessibility label/role. HIG Accessibility: convey status changes to assistive tech.
+  - fix: Wrap the veil VStack in `.accessibilityElement(children: .combine)` with `.accessibilityLabel(copy.primary + " " + copy.subtitle)` and post an announcement when the veil appears (e.g. AccessibilityNotification.Announcement). Mark decorative
+  - test: source-scan
+- **[Ingest overlay]** Progress bar value is a fabricated denominator, not real scan progress
+  - rule (charter): Charter: "No fake progress… Every number on screen comes from real state." HIG Progress indicators: use a determinate bar only when you can report accurate progress, otherwise use indeterminate.
+  - fix: If total scan count is unknown during a recursive walk, use an indeterminate `ProgressView()` (spinner/barberpole) — honest about unknown duration. Only render `ProgressView(value:total:)` once FolderScanner can emit a real total.
+  - test: source-scan
+- **[Menu bar / Edit menu]** Cut/Copy/Paste removed app-wide by replacing the .pasteboard command group
+  - rule (HIG): HIG Keyboards: "Respect standard keyboard shortcuts. People expect the standard keyboard shortcuts to work, regardless of the app they're using." Cmd-X/C/V (Cut/Copy/Paste) are standard editing shortcuts that must remain available wherever 
+  - fix: Do NOT replace `.pasteboard`. Put the selection commands in their own group, e.g. `CommandMenu("Selection")` or append via `CommandGroup(after: .pasteboard)`, leaving stock Cut/Copy/Paste intact so text fields keep editing commands.
+  - test: both
+- **[Inspector / Config]** Pickers use labelsHidden() without an accessibility label/role
+  - rule (a11y): Audit requirement #4 + HIG Accessibility: a control with a hidden visible label must still expose an accessibility label so VoiceOver announces its purpose. Segmented controls and color wells need a programmatic label.
+  - fix: Add `.accessibilityLabel("Background")`, `.accessibilityLabel("Output format")`, `.accessibilityLabel("Algorithm")` to the respective Pickers even with labelsHidden(), so the role+label pair is complete.
+  - test: source-scan
+- **[Inspector / Config]** Algorithm picker has no counterpart in the design SSOT (>3% drift)
+  - rule (SSOT): SSOT: design/project/app.jsx ConfigPanel renders exactly three controls — Background, Format, and (in Advanced) name pattern. There is NO Algorithm control. Charter: drift > 3% is a release blocker; "adjust the design to live within real Sw
+  - fix: Either remove the Algorithm picker from the primary config to match the spec, or (preferred per design ownership) update design/project/app.jsx + styles.css to add the Algorithm control so the HTML spec and Swift agree. Do not leave the two
+  - test: both
+- **[Inspector / Config panel]** Disclosure rows are a custom-painted DisclosureGroup clone, not the stock control
+  - rule (charter): Charter: 'Custom views are for composing app-specific content, never for repainting OS chrome. Specifically forbidden: hand-rolled ... lists ... SwiftUI ships all of these.' DisclosureGroup is the stock primitive for a chevron+label expand/
+  - fix: Replace ClickRowDisclosure with stock DisclosureGroup(title, isExpanded: $isExpanded) { content }. If the whole-row tap target is the only reason for the custom view, that is the default behavior of DisclosureGroup's label area; drop the cu
+  - test: source-scan
+- **[Inspector / Config — disclosure section headers]** Custom-painted disclosure (ClickRowDisclosure) replaces stock SwiftUI DisclosureGroup
+  - rule (charter): Charter 'Standard SwiftUI primitives only — no custom-painted OS chrome': 'Hand-rolled scrollbars, hand-rolled focus rings, hand-rolled list separators, hand-rolled context menus. SwiftUI ships all of these.' DisclosureGroup is a stock prim
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/Views/Settings/ClickRowDisclosure.swift:8`
+  - fix: Replace ClickRowDisclosure with stock DisclosureGroup("Title", isExpanded: $isExpanded) { content }. If full-row hit target is desired, that is the default behaviour of DisclosureGroup's label; do not reimplement the control.
+  - test: source-scan
+- **[Inspector header]** Garbled header text 'Filters —filter chain' with em-dash glued to a word
+  - rule (HIG): HIG Typography / Writing — labels must be clear and correctly formatted; an em-dash should not be jammed against the following word with no space, and a section title should read as a phrase, not a fragment.
+  - where: `screenshot 16-advanced-chain-editor.png (inspector header)`
+  - fix: Use a clean stock section header, e.g. Text("Filters").font(.headline) with proper spacing, and if a subtitle is needed put it as a separate .secondary .caption line. Do not concatenate an em-dash directly onto a word.
+  - test: both
+- **[Toolbar (top-right action group)]** Three name-token pills '(name) (ext) (n:02)' sit in the window toolbar — not stock, not in spec
+  - rule (SSOT): Charter: stock Button/Menu inside ToolbarItemGroup; toolbar holds the primary action where Finder's Share/Action live. SSOT: name tokens belong inside the Config 'Name as' row as small token buttons (app.jsx:383-387), not in the window chro
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/design/project/app.jsx:383`
+  - fix: Move the {name}/{ext}/{n:02} token buttons into the Config 'Name as' row as a small HStack of bordered Buttons under the TextField, matching app.jsx; keep only the add and run-all actions in ToolbarItemGroup.
+  - test: both
+- **[Toolbar / primary action (Run all)]** Primary action labeled "Run all", not the spec's "Remove background from N"
+  - rule (SSOT): Design SSOT drift > 3% is a release blocker; charter forbids labels that drift from the spec copy. app.jsx TitleBar primary button reads `Remove background from <b>{pending}</b>` (or "All done"), not "Run all".
+  - fix: Bind the toolbar's prominent Button label to pending count: `Text("Remove background from \(pending)")` when pending>0 else `Text("All done")`, matching the SSOT. Keep `.buttonStyle(.borderedProminent)`.
+  - test: both
+- **[Inspector / Config panel]** Inspector is a wholesale redesign (checkbox filter sections) unrelated to the spec's Config bar
+  - rule (SSOT): SSOT drift > 3% is a release blocker. The spec's Config (app.jsx:365-425) is a labeled control group: "Save to", "Name as" (+ {name}/{ext}/{n:02} tokens), "Background" (Transparent/Color/Image + presets), "Format" (PNG/JPEG/HEIC/TIFF). The 
+  - fix: Reconcile with the SSOT: either update design/project to ratify this new inspector (re-baseline the spec) or rebuild the panel as the spec's `Form` with `Picker`/`TextField`/segmented `Picker` for Save-to/Name-as/Background/Format. The two 
+  - test: both
+- **[Context menu (right-click)]** Destructive "Remove from Queue" runs immediately with no confirmation from the context-menu path
+  - rule (HIG): HIG Menus: "Separate destructive commands ... should be warned about, and may require confirmation." The keyboard path guards with a confirmationDialog at >=10 items; the context-menu path does not, creating an inconsistent destructive cont
+  - where: `Sources/Views/FileListView.swift:250-252`
+  - fix: Route the context-menu Remove through the same handleDelete()/confirmationDialog logic (set pendingDeletionIDs + showDeleteConfirm) so both the keyboard and right-click destructive paths share the >=10 confirmation, or always confirm. Keep 
+  - test: both
+- **[Run history / outcome rows]** Hardcoded literal .green / .red instead of system semantic status colors
+  - rule (charter): Charter "Colour: ... System semantic colours (.primary, .secondary, .tertiary)" and "don't build a brand, inherit Apple's"; HIG Color — use system colors so they adapt to appearance/accent/increase-contrast.
+  - fix: Keep the icon, drop the literal color or use system-adaptive equivalents. Simplest stock fix: rely on the SF Symbol's intrinsic hierarchical color or use `.foregroundStyle(Color(nsColor: .systemGreen))` / `Color(nsColor: .systemRed)` which 
+  - test: source-scan
+- **[Run history / outcome rows]** Green success text fails WCAG AA contrast on the light inspector background
+  - rule (a11y): Accessibility authority #4 — WCAG AA contrast (4.5:1 for normal text); HIG Color — ensure sufficient contrast for text.
+  - fix: Use a darker AA-compliant green for text (e.g. the design token DesignColor.green #249C50 is closer but still verify ~4.5:1, or `Color(nsColor:.systemGreen)` with Increase Contrast). Better: color only the icon and render the word "Success"
+  - test: both
+- **[Run history / error rows]** Failure message reachable only via hover tooltip (.help) — not keyboard/VoiceOver/visible
+  - rule (a11y): HIG Accessibility — never hide information behind hover-only affordances; provide a text alternative reachable without a pointer. Charter "surface the real stderr ... Fail loud."
+  - fix: Render the message as visible secondary text under the code (a `Text(message).font(.footnote).foregroundStyle(.secondary).lineLimit(2)`), and/or add `.accessibilityLabel("Failed: \(code). \(message)")` to the row so VoiceOver speaks it. Kee
+  - test: both
+- **[Inspector / Config]** Algorithm section does not exist in the design SSOT — net-new UI, drift > 3%
+  - rule (SSOT): Design SSOT is the spec; drift > 3% is a release blocker. The HTML ConfigPanel (app.jsx) exposes only Background and Format — there is no Algorithm control.
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/Views/ConfigPanel.swift:64`
+  - fix: Either move the Algorithm control under the existing "Advanced" disclosure (where power-user flags already live) so the first-time Inspector matches the SSOT's Background/Format-only surface, or update the SSOT HTML to include it. Use the s
+  - test: both
+- **[Dual preview]** Pane labels are uppercase "ORIGINAL"/"CUTOUT" but SSOT specifies title-case "Original"/"Removed"
+  - rule (SSOT): Design SSOT is the spec for copy; drift > 3% is a release blocker (CLAUDE.md "Design reference"). SSOT text content is the word "Removed" (uppercased only via CSS text-transform), not "CUTOUT".
+  - fix: Pass label: "Original" and label: "Removed". Keep glyphs title-case in the string; if all-caps display is wanted, apply `.textCase(.uppercase)` on the Text (mirroring CSS text-transform) rather than baking caps into the literal — but the se
+  - test: both
+- **[Dual preview]** Entire zoom/pan/floating-control interaction model has no counterpart in the SSOT (>3% drift)
+  - rule (SSOT): Every Swift screen must match its HTML counterpart; drift > 3% is a release blocker (CLAUDE.md "Design reference (this is the spec)"). The SSOT dual view is a static 2-pane grid.
+  - fix: Either (a) add the zoom/pan/control surface to design/project/bgbgone.html + styles.css so the spec and app agree, or (b) remove the unspecced interaction from the Swift view. Spec and implementation must be reconciled before release; an un
+  - test: source-scan
+- **[File list / Table (Quick Look)]** Space-bar Quick Look does not open a preview panel
+  - rule (charter): Charter: 'Table (... Space-to-quicklook) — exactly Finder's behaviour' and 'Quick Look integration: Space-bar previews any selected image via QLPreviewPanel'. This is a non-negotiable north-star behaviour.
+  - fix: Wire Space-bar in the Table to NSApp.sendAction(toggleQuickLook) / present QLPreviewPanel via an NSViewControllerRepresentable that becomes the panel's QLPreviewPanelController data source, feeding the selected ImageFile URL. Add a .keyboar
+  - test: e2e-peekaboo
+- **[File list / Table (status column)]** Status text says 'Demo … ms' on a shipping screen
+  - rule (charter): Charter: 'No aspirational labels … Every status string must be derived from real state, not aspiration' and 'No fake timestamps, fake progress, fake counts'.
+  - fix: Drive the status string solely from RunResult: 'Done · {ms} ms' on success, the real stderr-derived error on failure, 'Not removed' for raw. Remove any 'Demo' branch from the status formatter.
+  - test: both
+- **[Inspector / Config panel]** Unspecified 'Algorithm' segmented control present in the always-visible inspector
+  - rule (SSOT): No aspirational/extra UI beyond the spec; SSOT is the layout/copy authority (charter 'NO FAKE UI', 'Design reference').
+  - fix: Either remove the Algorithm picker from the inspector to match the SSOT, or update design/project/app.jsx + bgbgone.html to add the Algorithm row to the spec first, then keep the app in sync. Use a stock Picker(.segmented) row inside the sa
+  - test: both
+- **[Empty state (file-list overlay)]** "Try Demo" button violates the empty-first-launch charter rule and is absent from the design SSOT
+  - rule (charter): Charter: "The first-launch state is empty — the drop zone, nothing else" and "Bake in sample/demo files … anywhere the user might mistake them for their own work" is forbidden. SSOT app.jsx files-empty (lines 451-456) has NO demo button — o
+  - fix: Remove the "Try Demo" Button (and the bundled demo assets path) from the empty state. Replace with the SSOT's secondary affordance: a `.secondary`-styled Text "or use Add files…" matching app.jsx:455. The demo flow, if kept, belongs behind 
+  - test: both
+- **[Empty state (file-list overlay)]** Primary copy drifts from SSOT: "Drop images here" vs spec "Drop a folder or images here"
+  - rule (SSOT): SSOT is the spec; copy drift > 3% is a release blocker. Charter Golden Goal centres on dropping a FOLDER; the spec copy intentionally says "a folder or images".
+  - fix: Change the Text literal to "Drop a folder or images here" to match app.jsx:454 exactly.
+  - test: both
+- **[Main content area / empty (idle) drop state]** Idle empty state shows wrong copy and wrong CTAs vs. design spec
+  - rule (SSOT): SSOT layout/copy parity — drift > 3% is a release blocker; the design's DualView empty state is the authority for this state
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/build/screenshots/audit/03-debug-idle.png (center content); design/project/app.jsx:301-317`
+  - fix: Render the spec'd empty state with stock SwiftUI: VStack { Image(systemName:) ; Text("Drop a folder or images to begin.").font(.headline) ; Text("PNG · JPG · HEIC · TIFF · AVIF · sub-folders OK").font(.footnote).foregroundStyle(.secondary) 
+  - test: both
+- **[Main content area / empty (idle) drop state]** 'Try Demo' button bakes demo bait into the shipping empty state
+  - rule (charter): Charter NO FAKE UI / NO FAKE DATA — first-launch state is empty (the drop zone, nothing else); no baked-in demo/sample triggers, no aspirational affordances
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/build/screenshots/audit/03-debug-idle.png (button below 'Drop images here')`
+  - fix: Remove the 'Try Demo' button from shipping UI. Replace with the real importers: Button("Choose folder…"){ pickFolder() }.buttonStyle(.borderedProminent) and Button("Choose files…"){ pickFiles() } backed by .fileImporter.
+  - test: both
+- **[Quick Look]** Space-bar does not toggle the Quick Look panel closed (HIG toggle contract broken)
+  - rule (HIG): macOS Quick Look HIG / Finder behaviour: pressing Space with the preview open dismisses it (Space is a toggle: open ↔ close). The standard QLPreviewPanel handles Space-to-close only when the panel holds key focus.
+  - fix: In present(), branch on visibility: if `panel.isVisible` call `panel.orderOut(nil)` (toggle closed) instead of `reloadData()`; only reloadData when the URL set actually changed. Let the real QLPreviewPanel own Space-to-close by not re-grabb
+  - test: both
+- **[Quick Look]** viewDidMoveToWindow unconditionally steals first responder, hijacking Table keyboard focus
+  - rule (HIG): HIG keyboard / focus: the focused control owns key events; an app must not forcibly seize first responder from the user's focused view. The Table is the Finder-style focus owner for selection, type-select, arrow navigation, Space/Return/Del
+  - fix: Do not force first responder on attach. Either let the SwiftUI Table own focus and attach key handling via `.onKeyPress(.space/.return/.delete)` on the Table (macOS 14+ stock SwiftUI), or only become first responder when the Table is not fo
+  - test: both
+- **[Empty state / drop zone]** Empty-state copy drifts from the design SSOT ("Drop images here" vs "Drop a folder or images to begin.")
+  - rule (SSOT): Design SSOT is the spec for copy; drift > 3% is a release blocker (CLAUDE.md "Design reference"). app.jsx:309 specifies the exact string "Drop a folder or images to begin."
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/Views/FileListView.swift:149`
+  - fix: Change Text("Drop images here") in FileListView.swift to Text("Drop a folder or images to begin.") to match the SSOT string verbatim.
+  - test: both
+- **[Empty state / drop zone]** Format-hint sub-line is missing ("PNG · JPG · HEIC · TIFF · AVIF · sub-folders OK")
+  - rule (SSOT): SSOT specifies a secondary sub-line under the title (app.jsx:311, .dual-empty-sub in styles.css:140); omitting a whole spec'd element is > 3% layout drift = release blocker.
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/Views/FileListView.swift:144`
+  - fix: Add a Text("PNG · JPG · HEIC · TIFF · AVIF · sub-folders OK").font(.footnote).foregroundStyle(.secondary) below the title in FileListView.swift's emptyState VStack.
+  - test: both
+- **[Empty state / call-to-action buttons]** CTA mismatch: app shows a single low-contrast "Try Demo" button instead of spec'd "Choose folder…" (primary) + "Choose files…"
+  - rule (SSOT): SSOT specifies two CTAs — a primary "Choose folder…" and a secondary "Choose files…" (app.jsx:313-316). The screenshot shows neither; it shows one "Try Demo" button not present in the spec. CLAUDE.md also bars aspirational/non-real affordan
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/Views/FileListView.swift:152`
+  - fix: Replace the single Try Demo button with an HStack of two stock Buttons: Button("Choose folder…") {...}.buttonStyle(.borderedProminent) and Button("Choose files…") {...}.buttonStyle(.bordered), both wired to .fileImporter. Keep Try Demo only
+  - test: both
+- **[Status bar]** Icon-only folder buttons have no accessibility label — VoiceOver reads nothing actionable
+  - rule (a11y): HIG Accessibility / Buttons: every control, especially icon-only controls, must expose a clear accessibility label describing its action; an SF Symbol alone is not an accessible name.
+  - fix: Keep `.labelStyle(.iconOnly)` for visuals but add an explicit `.accessibilityLabel("Open Source Folder")` / `.accessibilityLabel("Open Output Folder")` to each Button (or rely on Label's text being surfaced — confirm with VoiceOver). Do not
+  - test: both
+- **[Design tokens (cross-cutting) / color]** Entire text palette is hardcoded sRGB literals instead of system semantic colors (.primary/.secondary/.tertiary)
+  - rule (charter): Charter § Colour: "System semantic colours (.primary, .secondary, .tertiary) for text." HIG (macOS) Color: prefer system-defined semantic colors so text adapts automatically to appearance and accessibility settings.
+  - fix: Replace the fg ladder with semantic roles: DesignColor.fg → .primary, fgMute → .secondary, fgFaint → .tertiary, fgGhost → .quaternary (or Color.secondary.opacity). Use .foregroundStyle(.primary/.secondary/.tertiary) directly at call sites.
+  - test: source-scan
+- **[Design tokens (cross-cutting) / color]** Hardcoded light-only literals do not adapt to Dark Mode (no dynamic/semantic colors)
+  - rule (HIG): HIG (macOS) Color / Dark Mode: use dynamic system colors that automatically adapt between Light and Dark appearance. Charter mandates system materials/semantic colors precisely so the app inherits appearance behavior.
+  - fix: Drop hardcoded surface literals in favor of system semantics/materials: bg → Color(NSColor.windowBackgroundColor) or .regularMaterial; bgPane/bgSoft → Color(NSColor.controlBackgroundColor)/.thinMaterial; border → Color(NSColor.separatorColo
+  - test: both
+- **[Sidebar]** Sidebar exists in the app but is absent from the canonical design SSOT (bgbgone.html)
+  - rule (SSOT): Charter: 'design/project/bgbgone.html is the spec ... drift > 3% is a release blocker.' SSOT priority #3.
+  - where: `design/project/bgbgone.html (absent) vs Sources/Views/SourceSidebar.swift:1-48`
+  - fix: Reconcile spec and code: either add the sidebar to the canonical bgbgone.html SSOT (with its Library/Sources sections, All Files / Single Files rows, badges) so the implemented surface is specced, or remove SourceSidebar from the Navigation
+  - test: both
+- **[Inspector / Run History]** History entry is clipped by the window's bottom edge and rounded corner
+  - rule (HIG): HIG Layout: content must be fully visible within the window's safe content area; controls/text must not be occluded by the window frame or corner radius
+  - fix: Wrap the history list in a ScrollView/List that respects the inspector's safe area; add bottom content inset (.contentMargins or .safeAreaPadding) so the last row clears the window corner. Let the inspector scroll rather than render rows un
+  - test: both
+- **[Inspector / Run History]** List is a hand-rolled LazyVStack with manual Divider() instead of a stock List
+  - rule (charter): Charter: 'the file list uses real Table … Not a hand-rolled LazyVStack'; 'hand-rolled list separators' are forbidden — SwiftUI ships List/separators
+  - fix: Replace the LazyVStack+Divider with a `List(entries) { RunHistoryRow($0) }` (or `.listStyle(.inset)`), letting SwiftUI render separators, insets, and scroll behaviour. This also fixes the bottom-clipping issue for free.
+  - test: source-scan
+- **[Tweaks panel (debug/demo harness)]** Floating panel-in-panel with hand-drawn X close button (non-stock chrome)
+  - rule (charter): Charter: no floating panels-in-panels; sheets/dialogs must be native .sheet/.alert/.popover; custom context menus / focus rings / close glyphs are forbidden — SwiftUI ships these.
+  - where: `build/screenshots/audit/07-debug-drag-blocked.png`
+  - fix: If any inspector survives at all, present it as a native .popover or .sheet (with the system close affordance / Done button), or move it to the macOS Settings scene. Do not paint a floating card with a custom X.
+  - test: e2e-peekaboo
+- **[DropVeil (blocked / 'Nothing to add')]** Veil card background is grey, spec mandates white
+  - rule (SSOT): SSOT drift > 3% is a release blocker. styles.css .drop-veil-card { background: white }.
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/design/project/styles.css:404`
+  - fix: Set the card fill to Color.white (or .background(.background) for system white), not a bgSoft/secondary grey. Keep the red dashed border + 14pt radius.
+  - test: both
+- **[Mask refinement / Foreground transforms / Background filters — value sliders]** Sliders expose percentage to VoiceOver instead of the real px/degree/× value shown on screen
+  - rule (a11y): HIG Sliders + Accessibility: a slider with a meaningful unit should announce its actual value (and unit), not a bare 0–100% derived from position; the on-screen value and the spoken value must agree.
+  - fix: Attach .accessibilityValue("\(Int(v)) px") (and a descriptive .accessibilityLabel) to each Slider so the spoken value matches the trailing Text label.
+  - test: both
+- **[File table]** Status, Cutout, and Source Folder cells have no accessibility label/value
+  - rule (a11y): HIG Accessibility: "All interactive controls require descriptive accessibility labels; images should have an accessibility description." VoiceOver must announce each cell's meaning.
+  - fix: Add `.accessibilityElement(children: .ignore).accessibilityLabel(label)` to StatusPill; mark decorative icons `.accessibilityHidden(true)`; give the cutout cell `.accessibilityLabel(exists ? "Cutout: \(name)" : "No cutout yet")`.
+  - test: e2e-peekaboo
+- **[File table]** Table columns drift from the design SSOT (7 stock columns vs 5 spec columns + batch grouping)
+  - rule (SSOT): Charter: "Design reference ... must match its HTML counterpart ... drift > 3% is a release blocker." SSOT defines the file list shape.
+  - fix: Either bring the design HTML up to the implemented columns (and re-baseline the SSOT), or restructure: add a 36×36 thumbnail to the Name cell, fold Source-Folder into batch grouping (Table sections / DisclosureGroup), and add the "N images 
+  - test: both
+- **[Modals / Remove-confirm dialog]** Remove confirmation only fires at >=10 items; 1-9 deletions are silent and irreversible from the UI
+  - rule (charter): Charter 'Finder, but for background removal': Finder confirms a removal triggered by the Delete key (it never silently empties selection without an undoable path). HIG Alerts: use an alert to confirm a user-initiated action that has consequ
+  - fix: Either always present the confirmationDialog for any destructive remove (Finder confirms eject/remove uniformly), or guarantee a Cmd-Z undo path for the silent branch. Simplest stock fix: drop the `>= 10` gate and always set `pendingDeletio
+  - test: both
+- **[Toolbar]** Primary action copy drifts from SSOT: 'Run all'/'Stop' vs spec 'Remove background from N'/'All done'
+  - rule (SSOT): SSOT drift > 3% is a release blocker (CLAUDE.md design reference). The design spec defines the primary toolbar button copy explicitly.
+  - fix: Either update the Swift toolbar label to "Remove background from \(pending)" / "All done" to match SSOT, or update the SSOT — but as-is this is unreconciled copy drift. The dynamic count (pending) is also missing from the Swift button.
+  - test: both
+- **[Missing-binary state]** Body text uses hardcoded hex colors instead of system semantic colors
+  - rule (charter): Charter: 'System semantic colours (.primary/.secondary/.tertiary) for text' (CLAUDE.md:28); 'NO FAKE UI ... inherit Apple's' colors.
+  - fix: Replace .foregroundStyle(DesignColor.fg/fgMute/fgFaint) with .primary/.secondary/.tertiary.
+  - test: source-scan
+- **[Missing-binary state]** Background uses hardcoded near-white DesignColor.bg instead of system window background
+  - rule (charter): Charter 'Finder eyeball test': use stock system materials/colors; DesignColor.bg is a fixed #fcfcfd that won't match Finder in Dark Mode.
+  - fix: Remove the .background or use .background(.windowBackground) (or Color(nsColor: .windowBackgroundColor)).
+  - test: source-scan
+- **[Debug overlay (dev)]** Hand-rolled MiniDebugButtonStyle repaints buttons as grey rectangles with hardcoded white text
+  - rule (charter): Charter: "Custom button shapes that imitate .borderedProminent/.bordered" are forbidden; use real button styles. HIG (Color): don't hardcode white/grey text+fills that ignore appearance/accent.
+  - fix: Delete MiniDebugButtonStyle and use stock `.buttonStyle(.bordered)` (or `.borderedProminent` + `.controlSize(.small)`) on the Reset/Mark-all/Copy/Save/Clear buttons. Source-scan test: no custom `ButtonStyle` that fills a `RoundedRectangle` 
+  - test: source-scan
+- **[Debug overlay (dev)]** Icon-only close button has no accessibility label/role
+  - rule (a11y): HIG (Accessibility) / a11y mandate: every interactive element needs an accessibility label. An icon-only `xmark` button is announced as nothing usable by VoiceOver. (Design spec even labels it: tweaks-panel.jsx:264 `aria-label="Close tweaks
+  - fix: Use `Button("Close tweaks", systemImage: "xmark", action: onClose)` with `.labelStyle(.iconOnly)`, or add `.accessibilityLabel("Close tweaks")`. Source-scan test: every icon-only Button has an accessibilityLabel.
+  - test: both
+- **[DropVeil (drag overlay) — primary copy]** Veil primary line drops the accent-colored count and the mono folder-name pill the SSOT mandates
+  - rule (SSOT): SSOT design parity (drift > 3% is a release blocker): .drop-veil-primary b { color: var(--accent); font-feature-settings: tnum } and .drop-veil-primary .hint-em { font-family: var(--font-mono); background accent-tint; color: var(--accent); 
+  - fix: Build the primary line as a composed SwiftUI Text using inline AttributedString / Text concatenation: render the folder name as a monospaced run with .foregroundStyle(.tint) and a subtle .tint.opacity(0.12) capsule background (Text + .paddi
+  - test: both
+- **[Inspector / Config — section headers]** "Mask refinement" disclosure is a hand-rolled clickable-row, not a stock DisclosureGroup
+  - rule (charter): Charter: STOCK SwiftUI primitives only; "Hand-rolled … context menus / disclosure machinery" forbidden — "Custom views are for composing app-specific content, never for repainting OS chrome." HIG: use the system disclosure control so the ch
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/Views/Settings/ClickRowDisclosure.swift:1`
+  - fix: Replace ClickRowDisclosure with stock `DisclosureGroup(title, isExpanded: $isExpanded) { content }`. If a full-width hit target is required, that is achievable by labeling with a Text and relying on the native header, not by rebuilding the 
+  - test: source-scan
+- **[Drop affordance / DropVeil]** Veil tint is hardcoded but card material washes out contrast vs. design's solid white card
+  - rule (SSOT): Charter: system materials are allowed, but the SSOT spec (styles.css .drop-veil-card) is `background: white` with a strong drop shadow (0 20px 50px rgba) — a crisp, opaque card. The Swift card uses `.regularMaterial` over an accent-tinted v
+  - fix: Use an opaque card surface and a real shadow: `.background(.background.secondary, in: RoundedRectangle(cornerRadius: 14))` (or `Color(NSColor.windowBackgroundColor)`) plus `.shadow(color: .black.opacity(0.18), radius: 25, y: 12)`. Keep the 
+  - test: both
+
+### MEDIUM (90)
+
+- **[Drop veil]** Blocked-drop tint uses a hardcoded .red literal rather than a system semantic role
+  - rule (charter): Charter: "System semantic colours (.primary/.secondary/.tertiary)" and stock-system-color mandate; HIG Color: use system colors so they adapt to appearance/accessibility settings.
+  - fix: Use `Color(nsColor: .systemRed)` (appearance-adaptive) for the blocked state. The non-blocked branch is already correct with .accentColor.
+  - test: source-scan
+- **[Drop affordance (charter "Finder-style blue inset highlight")]** Drop target uses a centered dashed-border card, not Finder's inset rounded-rect highlight
+  - rule (charter): Charter: "Drop affordance: the same blue rounded-rect inset highlight Finder uses when you drag a file over a folder." HIG Drag and drop: use the standard drop highlight on the destination.
+  - fix: Replace the dashed card border with an inset solid accent highlight on the drop region: `.overlay { if targeted { RoundedRectangle(cornerRadius: 8).strokeBorder(Color.accentColor, lineWidth: 2).padding(2) } }` matching Finder; keep the smar
+  - test: e2e-peekaboo
+- **[Summary chip]** Dismiss (x) button hit target is below the HIG minimum
+  - rule (HIG): HIG (Pointer/controls): provide an adequately sized hit target; a bare SF Symbol image button is well under the ~28pt comfortable click target Apple uses for controls.
+  - fix: Add `.frame(width: 28, height: 28).contentShape(Rectangle())` (or use `.buttonStyle(.borderless)` with padding) and an `.accessibilityLabel("Dismiss")`.
+  - test: both
+- **[Menu bar / Edit menu]** Custom selection commands mis-grouped under the Pasteboard (Cut/Copy/Paste) semantic group
+  - rule (HIG): HIG Menus: place commands in the menu/section that matches their semantics; the Pasteboard group is reserved for clipboard actions. "Select All" belongs adjacent to clipboard items but "Select All Visible"/"Deselect All" are custom selectio
+  - fix: Move selection commands out of `.pasteboard`; if a stock Select All is wanted use `CommandGroup(after: .pasteboard)` to add them as a distinct section so the Edit menu reads Undo/Redo | Cut/Copy/Paste/Select All | Select All Visible/Deselec
+  - test: source-scan
+- **[Menu bar / shortcuts]** Empty-label invisible Button is keyboard-reachable but has no accessibility label/role
+  - rule (a11y): Accessibility (authority #4): every interactive element needs an accessibility label/role and must be reachable/announced; an `opacity(0)` Button with an empty title is invisible to sighted users yet present in the focus/AX tree with no nam
+  - fix: Delete the hidden Button entirely (see Cmd-` finding). A keyboard command should be expressed via a real menu `Button` in `.commands` (visible, labeled), not an invisible overlay button.
+  - test: source-scan
+- **[Menu bar / Help menu]** Standard Help menu removed, eliminating the system Help search and discoverability path
+  - rule (HIG): HIG Menus / The Menu Bar: macOS apps should provide a Help menu; it hosts the system-wide Help search field that surfaces every menu command by name (a primary discoverability mechanism). Removing it leaves commands like Undo/Select All Vis
+  - fix: Keep a minimal Help menu with at least one real item (e.g. a `Button("bgbgone Help")` opening the README/website via `NSWorkspace.shared.open`), which also restores the system Help search field. Do not `replacing: .help` with an empty closu
+  - test: e2e-peekaboo
+- **[Menu bar / shortcuts (Inspector toggle gap)]** Show/Hide Inspector and Run all have no menu command or keyboard shortcut
+  - rule (HIG): HIG Menus: every important toolbar action should have a menu-bar equivalent so it is discoverable and keyboard-accessible. The Inspector toggle and the primary "Run all" action are toolbar-only.
+  - fix: Add menu commands: a primary action (e.g. `CommandMenu("Process")` with "Run All" ⌘R) and "Show/Hide Inspector" ⌥⌘I via `CommandGroup(after: .sidebar)`, calling the same view-model intents the toolbar buttons use.
+  - test: both
+- **[Inspector / Config]** Color presets from SSOT dropped; ColorPicker omits the 5 spec swatches
+  - rule (SSOT): SSOT: app.jsx:362 + :403-409 specify Color mode renders 5 preset swatches (COLOR_PRESETS) plus a hex input. Config.swift:157 even keeps `colorPresets = [#ffffff,#000000,#0066cc,#f06a3a,#2da94f]` for the UI to read. The Swift surface shows n
+  - fix: Render the 5 presets as a row of stock `Button`s (small swatch fills) ahead of the ColorPicker, each setting config.background = .color(hex:). Keep the stock ColorPicker as the custom-color escape hatch. This satisfies the spec without cust
+  - test: both
+- **[Inspector / Config panel]** Bare checkboxes for slider-backed filters give no hint of their value range
+  - rule (HIG): HIG (macOS, Controls): a checkbox should represent a binary on/off state; settings with a magnitude (blur radius in px, desaturation amount 0–1) should reveal their adjustable control or value. The collapsed checkbox-only state hides that B
+  - fix: Use a labeled control that signals the parameter even when off — e.g. keep the Toggle but always show a disabled Slider/value, or move to a LabeledContent row; alternatively group the two graduated filters separately from the boolean Graysc
+  - test: e2e-peekaboo
+- **[Inspector / Background color well + NSColorPanel ("Colors" window)]** NSColorPanel exposes an Opacity slider the app silently discards
+  - rule (charter): Charter NO FAKE UI / truthfulness: controls must reflect real behaviour, not offer interactions that are ignored. HIG Color: don't present an opacity control if alpha has no effect.
+  - fix: There is no SwiftUI hook to hide NSColorPanel's opacity row, so either (a) set NSColorPanel.shared.showsAlpha = false when the well is engaged, or (b) honour alpha end-to-end (toHex8 + pass --bg with alpha to bgbgone). Option (a) keeps the 
+  - test: e2e-peekaboo
+- **[Inspector / Config — Mask refinement & Foreground transforms checkboxes]** Activator controls render as circular radio-style marks, not standard macOS checkbox squares
+  - rule (HIG): HIG (macOS Controls › Checkboxes): a checkbox is a square box that toggles an independent option; a circle implies a radio/single-choice control. Scale/Translate/Rotate/Flip and Soften/Threshold/Expand/Contract are independent multi-select 
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/build/screenshots/audit/14-advanced-foreground-transforms.png`
+  - fix: Render these as plain Toggle in a Form/GroupBox so they get the system checkbox (square) appearance; remove any .toggleStyle/.controlShape that forces a circular/radio look. Multi-select independent options = checkboxes per HIG.
+  - test: both
+- **[Inspector / Config — 'Run History' footer]** 'Run History' section header present with no spec backing and ambiguous truthfulness
+  - rule (SSOT): SSOT drift (>3% blocker) + charter 'No aspirational labels': every visible string must be derived from real state. 'Run History' / 'No runs yet for this file.' is not in the design spec.
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/build/screenshots/audit/14-advanced-foreground-transforms.png`
+  - fix: Either spec 'Run History' in app.jsx and back it with real RunResult records per file, or remove it. If kept, the empty-state string must derive from real (empty) state, not be a static placeholder.
+  - test: both
+- **[Inspector / Advanced — full filter chain editor]** Custom ClickRowDisclosure reimplements DisclosureGroup instead of using the stock control
+  - rule (charter): Charter: 'Standard SwiftUI primitives only — no custom-painted OS chrome … Hand-rolled … context menus' forbidden; 'SwiftUI ships all of these.' DisclosureGroup is the stock element for collapsible sections.
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/Views/Settings/ClickRowDisclosure.swift:8`
+  - fix: Replace ClickRowDisclosure with stock DisclosureGroup("Advanced — full filter chain", isExpanded:$isExpanded){...}. If the whole-row tap target is the only reason, that is achievable with DisclosureGroup's label and is not sufficient justif
+  - test: source-scan
+- **[Inspector / Advanced chain editor — text field]** Custom red RoundedRectangle stroke overlay paints a fake error focus ring on the TextField
+  - rule (charter): Charter: 'Hand-rolled focus rings' forbidden — use stock control validation affordances. HIG: rely on system focus ring; do not hand-paint borders that compete with it.
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/Views/Settings/AdvancedChainEditor.swift:36`
+  - fix: Drop the custom overlay. Convey validation state via a stock Label/Text error message below the field (already present, lines 42-46) and let the system focus ring stand alone; do not stroke a competing rectangle.
+  - test: source-scan
+- **[Inspector — checkbox rows]** Dense unchecked checkbox lists give weak grouping/spacing and small hit targets
+  - rule (HIG): HIG Layout & Controls: group related controls with adequate spacing; pointer/hit targets should meet the macOS minimum (~24pt height for comfortable clicking). DesignRadius/spacing tokens (14/8/5) should be applied consistently.
+  - where: `screenshot 16-advanced-chain-editor.png (inspector checkbox groups)`
+  - fix: Render the groups inside a stock Form with Section headers (Mask refinement / Foreground transforms / Background filters); use Toggle (not bare checkboxes) so the whole row label is the hit target, and apply consistent 8pt section spacing.
+  - test: both
+- **[Inspector / Run History pane]** Run History section likely off-spec (not present in SSOT)
+  - rule (SSOT): SSOT drift > 3% is a blocker — the design has no per-file 'Run History' pane (app.jsx Config/StatusBar contain no such element).
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/Views/Inspector/RunHistoryView.swift:16`
+  - fix: Add the Run History pane to the design SSOT first if it is a real feature, or remove it; keep the app and the spec in lockstep per charter §'Design reference'.
+  - test: both
+- **[Toolbar / Add button]** "+ Add" toolbar label diverges from spec's "Add files…"
+  - rule (SSOT): SSOT copy drift. app.jsx:286 defines the secondary toolbar button as `Add files…`.
+  - fix: Rename the toolbar Button to `Text("Add files…")` (ellipsis required by HIG for actions that open a chooser). Use the system `plus` SF Symbol only if also keeping a clear text label.
+  - test: both
+- **[Title bar]** Title bar shows a "3 images" subtitle not present in the spec
+  - rule (SSOT): SSOT drift / charter "inherit Apple's chrome, don't craft". The spec TitleBar (app.jsx:280-296) renders only the brand "bgbgone" with no subtitle line; the count lives in the file-list header (`files-head-title`, app.jsx:443-446).
+  - fix: Either use the stock window subtitle API (`Window` `.navigationSubtitle("\(count) images")`) which renders Apple's native title/subtitle stack, or remove the subtitle and surface the count in the Table header per the SSOT. Do not hand-stack
+  - test: source-scan
+- **[Dual preview / pane tags]** Preview tags read "ORIGINAL" / "CUTOUT" instead of spec "Original" / "Removed"
+  - rule (SSOT): SSOT copy drift. app.jsx:327,331 set dual-pane tags to "Original" and "Removed" (title case).
+  - fix: Set the tag Text to "Original"/"Removed" and let SwiftUI render system casing; if all-caps is desired use `.textCase(.uppercase)` on a stock `Text` rather than hardcoding uppercase strings, but the spec value is title-case "Removed" not "CU
+  - test: both
+- **[Inspector / Advanced filter chain]** Filter-chain field shows greyed example text resembling a placeholder/aspirational hint
+  - rule (charter): Charter: "No placeholder art, no aspirational labels"; every string must derive from real state. A static "e.g. …" example is acceptable only as a true `TextField` prompt, not as faux content.
+  - fix: Render this as a real `TextField("mask:feather=9;…", text: $chain)` so the grey string is the system `prompt` (disappears on input) rather than baked-in label text; bind the value to actual Config state.
+  - test: source-scan
+- **[Toolbar / naming tokens]** Filename-pattern token pills ((name)/(ext)/(n:02)) placed in the window toolbar
+  - rule (HIG): HIG (macOS Toolbars): the toolbar holds frequent window-level commands, not field-specific input affordances. SSOT puts the {name}/{ext}/{n:02} tokens inline beside the "Name as" text field (app.jsx:383-387).
+  - fix: Move the token buttons next to the naming `TextField` inside the inspector/Config (a `ControlGroup` or trailing `HStack` of small `Button`s), removing them from `ToolbarItemGroup`. Keep the toolbar to sidebar-toggle / Add / Run / inspector-
+  - test: both
+- **[Toolbar / icon-only toggles]** Sidebar and inspector toggle are icon-only with no visible/aria label
+  - rule (a11y): HIG (Toolbars + Accessibility): icon-only toolbar buttons need an accessibility label and ideally a help tooltip; hit target >= 44pt advisory / >= ~28pt control min.
+  - fix: Use `Label("Hide Sidebar", systemImage: "sidebar.left")` with `.labelStyle(.iconOnly)` and add `.help("Toggle Sidebar")`; same for the inspector toggle. SwiftUI then exposes a proper accessibility label.
+  - test: both
+- **[Sidebar]** Sidebar source-list copy ("Library / All Files / Sources / bgbgone-demo") is not defined in the SSOT
+  - rule (SSOT): SSOT drift / charter "no baked-in sample/demo files". The spec has no NavigationSplitView sidebar; "bgbgone-demo" reads like a baked-in demo source.
+  - fix: If a sidebar is intended, ratify it in the SSOT first and populate "Sources" only from real dropped folders (empty on first launch). Remove any literal "bgbgone-demo" seed entry. Use `List(selection:)` styled `.listStyle(.sidebar)` inside `
+  - test: both
+- **[Context menu (right-click on file row)]** Context-menu state has no counterpart in the design SSOT (bgbgone.html), so layout/copy/ordering are unspecified and unverifiable against spec
+  - rule (SSOT): SSOT authority: design/project/bgbgone.html is the spec for layout/color/copy/interaction; any shipped UI state must have a matching HTML counterpart (drift > 3% is a release blocker). A state absent from the SSOT cannot be validated.
+  - fix: Add a context-menu state to bgbgone.html (the 8 items in their 4 groups) so the Swift menu in FileListView.swift can be diffed against the SSOT; until then the menu's copy and grouping are author-discretion, not spec-backed.
+  - test: source-scan
+- **[Status bar / footer]** Folder + tray glyphs are interactive buttons but render with zero affordance (look like static decoration)
+  - rule (HIG): HIG (macOS) Buttons / Toolbars: interactive controls must be visually distinguishable as actionable; an icon that can be clicked should read as a control, not as a static label. Charter 'Finder eyeball test' — Finder's status-bar items reve
+  - fix: Keep .borderless but make the buttons read as controls: wrap each in a fixed hit area and give the disabled source button a visibly dimmed state, or use .buttonStyle(.accessoryBar)/.plain with a .help already present plus an .onHover backgr
+  - test: e2e-peekaboo
+- **[Status bar / footer]** Icon-only status buttons fall below HIG minimum hit-target in a 28pt strip
+  - rule (HIG): HIG (macOS) Pointer/Layout — controls should provide an adequate click target (≈28x28pt min for pointer controls); a11y authority requires hit target >= HIG min.
+  - fix: Give each button an explicit min hit area, e.g. .frame(width: 24, height: 24) (or .contentShape(Rectangle()) over a padded label) so the clickable region meets the pointer minimum even though the glyph stays small. Keep them inside the 28pt
+  - test: both
+- **[Context menu (right-click)]** Dead disabled "Add files…" placeholder button in the empty-selection menu
+  - rule (charter): Charter (CLAUDE.md lines 79-81): "No aspirational labels" / no dead UI; HIG Menus: "Hide commands that are never relevant" rather than ship a permanently-disabled no-op. A button whose closure is an empty comment is fake UI.
+  - where: `Sources/Views/FileListView.swift:186`
+  - fix: Either wire the action to the real add-files command (fileImporter) so it works, or omit the empty-selection branch entirely so right-clicking empty space shows no menu (stock Table behavior). Do not ship a disabled placeholder.
+  - test: source-scan
+- **[Context menu (right-click)]** Design SSOT defines no context-menu spec — surface is unspecified, drift cannot be measured
+  - rule (SSOT): Charter (CLAUDE.md lines 180-182): bgbgone.html "is the spec for layout, color, copy, and interaction ... drift > 3% is a release blocker." The right-click menu (8 items, copy/labels/ordering) has zero counterpart in the SSOT, so its copy a
+  - where: `design/project/bgbgone.html`
+  - fix: Add a context-menu section to the design SSOT (item list, order, grouping, dividers, destructive placement, exact copy) so the Swift menu can be diffed against it, or explicitly delegate to Finder's stock menu conventions in the charter and
+  - test: source-scan
+- **[Inspector / Config]** Segmented pickers use .labelsHidden() with no accessibility label
+  - rule (a11y): HIG Accessibility / VoiceOver: every control must expose a label. SwiftUI .labelsHidden() removes the visible label AND the accessibility label unless one is re-supplied.
+  - fix: Keep .labelsHidden() for layout but add .accessibilityLabel("Algorithm") (etc.) to each Picker so the role/label is announced.
+  - test: source-scan
+- **[Inspector / Config]** GroupBox + segmented-control stack drifts from the Finder 'stock app' eyeball test
+  - rule (charter): Charter 'Finder eyeball test': should read as a stock Apple app; SSOT drift > 3% is a release blocker. HIG: macOS settings forms use leading-aligned label/field rows (Form/.formStyle(.grouped)), not stacked full-width GroupBoxes each wrappi
+  - fix: Consider a single Form { Section } with .formStyle(.grouped) and trailing segmented controls, matching System Settings/Get Info row rhythm; verify against the rendered bgbgone.html inspector state before/after. If GroupBoxes are intentional
+  - test: both
+- **[Run history / list]** Hand-rolled LazyVStack + manual Divider instead of stock List
+  - rule (charter): Charter "Standard SwiftUI primitives only ... hand-rolled list separators [forbidden]. SwiftUI ships all of these"; UI feel north star: lists use real `List`, not a hand-rolled `LazyVStack`.
+  - fix: Replace with `List(entries.reversed()) { entry in RunHistoryRow(entry: entry) }` styled `.listStyle(.inset)` or `.plain`; let List provide separators and scrolling. Drop the manual `Divider()`.
+  - test: both
+- **[Run history / rows]** No composed accessibility label/role on outcome rows for VoiceOver
+  - rule (a11y): HIG Accessibility — group related sub-elements into one meaningful VoiceOver utterance; status elements need a spoken label.
+  - fix: Wrap the row in `.accessibilityElement(children: .combine)` (or `.ignore` + explicit label) and provide `.accessibilityLabel` summarizing date, outcome, duration, and (for failures) the message.
+  - test: e2e-peekaboo
+- **[Toolbar / primary action]** Primary action reads "Run all" instead of the charter/SSOT "Remove background from N"
+  - rule (SSOT): Charter UI north star: the primary action is "the 'Remove background from N' primary action" living top-right. SSOT app.jsx primary button copy is "Remove background from N". Label must be truthful and match spec; drift > 3% blocker.
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/App/BgBgOneApp.swift:195`
+  - fix: Change the toolbar Button title to the spec copy, e.g. Button("Remove Background from \(viewModel.files.count)") and keep .buttonStyle(.borderedProminent). Toggle to "Stop" while running, as today.
+  - test: both
+- **[Inspector + Toolbar]** Two filled accent (borderedProminent) buttons compete as the default action in one view
+  - rule (HIG): HIG (macOS, Buttons): a window should have a single default/prominent button; the filled style signals the one most-likely action. Multiple .borderedProminent buttons on screen create competing focal points and ambiguous default.
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/App/BgBgOneApp.swift:278`
+  - fix: Keep .borderedProminent only on the single primary action (the toolbar "Remove background from N"). Demote "Rerun This Image" to .buttonStyle(.bordered) so there is one unambiguous default per view.
+  - test: source-scan
+- **[Inspector / Config — Background "Colour" row]** Color well sits flush against the panel's left edge with no visible leading label alignment
+  - rule (HIG): HIG (Layout/Forms): form rows in an inspector should be left-aligned to a consistent content margin with a leading label; a control flush to the window edge breaks the alignment grid. SSOT: inspector content must follow consistent inset (De
+  - fix: Wrap the Background controls in a `Form`/`LabeledContent` (or align the ColorPicker with `HStack { Text("Colour"); Spacer(); ColorPicker(...).labelsHidden() }`) so the well aligns to the same leading inset as the segmented control and shows
+  - test: e2e-peekaboo
+- **[Dual preview]** Pane background and stroke use hardcoded black/secondary opacities instead of SSOT/system semantic colors
+  - rule (SSOT): Charter: system semantic colors (.primary/.secondary/.tertiary) and system materials only; SSOT pane fill is var(--bg-soft) and border is var(--border). drift > 3% blocker.
+  - fix: Use `Color(.quaternarySystemFill)` (or `.fill(.quaternary)`) for the pane fill and `.stroke(.separator, lineWidth: 1)` (or `Color(.separatorColor)`) for the border — both adapt to light/dark and match Finder's pane treatment.
+  - test: source-scan
+- **[Dual preview]** Hand-rolled splitter with manual height clamp instead of a stock split/resizable container
+  - rule (charter): Charter: "Standard SwiftUI primitives only — no custom-painted OS chrome ... hand-rolled list separators / focus rings" forbidden; Finder uses real split views. A Rectangle + raw DragGesture + NSCursor zone re-implements OS resize chrome.
+  - fix: Prefer a stock `Divider()` for the visual line, and if the preview/list must be user-resizable use a real split container (`NavigationSplitView`/`HSplitView`-style or `.resizable` panel) so the OS supplies the divider, cursor, and resize be
+  - test: source-scan
+- **[Ingest overlay / Cancel scan button]** 'Cancel scan' renders as plain secondary text, reads as a label not a control
+  - rule (HIG): HIG (Buttons / Controls): a button must look tappable and offer a clear affordance; destructive/abort actions need adequate visual weight and a hit target >= 44pt logical. A bare .plain secondary-gray string fails the affordance and discove
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/Views/DropOverlays.swift:102`
+  - fix: Give it a real control affordance: Button('Cancel scan', role:.cancel, action:onCancel).buttonStyle(.link) (or .bordered) so it reads as interactive and inherits keyboard/VoiceOver button role, and ensure the row has adequate vertical paddi
+  - test: both
+- **[Ingest overlay / folder icon]** Folder glyph lacks the rounded accent tile from the spec
+  - rule (SSOT): SSOT .ingest-folder-icon: 38x38 rounded-8 tile filled with var(--bg-selected), accent-colored folder glyph inside. Drift > 3% is a blocker.
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/Views/DropOverlays.swift:56`
+  - fix: Wrap the folder Image in a 38x38 RoundedRectangle(cornerRadius:8).fill(Color.accentColor.opacity(0.12)) tile with the glyph foregroundStyle(.tint) centered, matching .ingest-folder-icon.
+  - test: e2e-peekaboo
+- **[Ingest overlay / status text contrast]** Mono status sub-line and path rows risk failing WCAG AA at small size
+  - rule (a11y): Accessibility: WCAG AA requires >=4.5:1 for normal text. The spec sets .ingest-sub to var(--fg-faint) (#8c919c ~ 3.0:1 on white) and tail rows to var(--fg-mute); the Swift port uses .secondary at .caption (12pt mono), which on the light car
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/Views/DropOverlays.swift:76`
+  - fix: Use .foregroundStyle(.secondary) only for the unit words and .primary (or at least .secondary at a larger size) for the numeric counts and paths; verify >=4.5:1 against the card background.
+  - test: e2e-peekaboo
+- **[Inspector / Config panel (header)]** Status line copy 'Done · 1898 ms' truthfulness needs confirmation against real state
+  - rule (SSOT): Charter: 'Every number on screen comes from real state.' SSOT app.jsx uses 'Done · {ms} ms'.
+  - fix: Have both the SelectedMeta header and the FileList row read the identical RunResult.ms/state for the selected file so the strings and colors agree.
+  - test: source-scan
+- **[Inspector / Config panel]** 'Image' background segment missing the trailing ellipsis the spec uses
+  - rule (SSOT): HIG: a control whose activation opens a further dialog/picker before completing should signal it with a trailing ellipsis (…). SSOT copy authority.
+  - fix: Change Text("Image") to Text("Image…") in ConfigPanel.swift line 22 so it matches the SSOT and signals that picking it opens a file chooser.
+  - test: source-scan
+- **[Window / empty content area during summary]** Finder eyeball test fail: a 'summary' state that shows the first-launch empty screen is dishonest UI
+  - rule (charter): Charter 'NO FAKE UI': every status/state must be derived from real state and visible; 'Finder eyeball test' — nothing should look like a dead or wrong state. SSOT: summary is a distinct phase from idle/empty.
+  - fix: Make the summary phase render its own visible affordance window-wide (see finding 1). If a summary genuinely has zero added images, the chip should say so (e.g. 'No usable images found · 3 skipped') rather than silently reverting to the emp
+  - test: e2e-peekaboo
+- **[DropVeil / drag overlay (many images)]** Download glyph is missing its circular tinted disc backplate
+  - rule (SSOT): SSOT layout/visual parity, drift > 3% is a release blocker. design/project/styles.css .drop-veil-glyph specifies a 64×64 round disc (border-radius:50%, background:color-mix(in oklab, currentColor 10%, white)) framing the download icon.
+  - fix: Wrap the glyph Image in a Circle backplate: .frame(width:64,height:64).background(Circle().fill(Color.accentColor.opacity(0.1))) (or .tint.quaternary), matching the .drop-veil-glyph disc; keep the SF Symbol on top.
+  - test: both
+- **[DropVeil / drag overlay (many images)]** Count in 'Add 12 images' is not emphasized (no bold accent number)
+  - rule (SSOT): SSOT copy/typography spec: design/project/app.jsx:162 wraps the count as <b>{imageCount}</b> and styles.css:432 sets .drop-veil-primary b { font-weight:700; color:var(--accent); font-feature-settings:'tnum' }. The numeral must be bold and a
+  - fix: Build the primary as an AttributedString or concatenated Text (Text('Add ') + Text('12').bold().foregroundStyle(.tint).monospacedDigit() + Text(' images')), or change veilCopy() to return structured parts so the numeral can be emphasized li
+  - test: both
+- **[Empty state (file-list overlay)]** Missing the SSOT secondary subline "or use Add files…"
+  - rule (SSOT): SSOT spec parity: the empty state has a two-line text block (primary + faint mono subline). HIG empty-state guidance: give the user a clear next action, not just a hint.
+  - fix: Add a second `Text("or use Add files…").font(.callout).foregroundStyle(.secondary)` below the primary line, matching app.jsx:455. "Add files…" should point the user at the real toolbar add-files action.
+  - test: source-scan
+- **[Config / Inspector — Algorithm picker]** 'Vision Mask' algorithm label references Vision in a Vision-forbidden app
+  - rule (charter): Charter: no aspirational/untruthful labels; the app is forbidden to import Vision and must not claim Vision in the loop ('No "on-device · Vision" text when the app is forbidden from importing Vision')
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/build/screenshots/audit/03-debug-idle.png (Algorithm row, second segment); design/project/app.jsx:517`
+  - fix: Rename the algorithm options to the bgbgone CLI's actual --algo values (e.g. 'Auto', 'Mask', 'Subject', 'Saliency') and drop any 'Vision' wording in both the picker and the status bar.
+  - test: source-scan
+- **[Window toolbar — sidebar toggle]** Sidebar-toggle toolbar button is wrapped in a hand-drawn circular outline
+  - rule (charter): Charter: use real NSWindow chrome / stock toolbar items, no custom-painted OS chrome; HIG Toolbars — toolbar buttons are borderless icon buttons that gain a subtle background only on hover/press
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/build/screenshots/audit/03-debug-idle.png (top-left, next to title)`
+  - fix: Use a plain ToolbarItem { Button { } label: { Image(systemName: "sidebar.left") } } with no custom Circle/overlay/stroke; let the system supply hover/press affordance.
+  - test: e2e-peekaboo
+- **[Quick Look]** Space/Return/Delete are swallowed (not forwarded up) when selection is empty
+  - rule (HIG): HIG keyboard: unhandled key events must propagate up the responder chain (call super) so the system can provide standard feedback (e.g. beep) and so other responders/type-select can act. Silently eating keys is a dead-key defect.
+  - fix: Have the handlers return a Bool (handled?) and, when false, call `super.keyDown(with: event)` so the event propagates. Or only intercept these keyCodes when there is a non-empty selection; otherwise `super.keyDown`.
+  - test: source-scan
+- **[Toolbar (top-right + and sidebar toggles)]** Toolbar buttons rendered inside a drawn capsule/pill outline — looks crafted, not stock Finder chrome
+  - rule (charter): Charter "Finder eyeball test" + "no custom-painted OS chrome": toolbar items must be stock Button/Menu in ToolbarItemGroup with no hand-drawn container. HIG (Toolbars/macOS): toolbar buttons are borderless/plain icons, not wrapped in a visi
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/build/screenshots/audit/01-empty.png`
+  - fix: Use plain ToolbarItem(s)/ToolbarItemGroup with Button(systemImage:) and the default toolbar rendering; remove any custom .background/.overlay capsule or RoundedRectangle stroke wrapping the toolbar controls. Let SwiftUI's .toolbar provide t
+  - test: both
+- **[Toolbar (top-left sidebar toggle)]** Sidebar-toggle button has a heavy circular/rounded outline next to the traffic lights — non-stock placement and styling
+  - rule (charter): Charter: real NSWindow chrome, stock toolbar items, no custom-painted OS elements. HIG (Toolbars): the sidebar toggle is a borderless icon, conventionally not boxed in a circle abutting the traffic lights.
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/build/screenshots/audit/01-empty.png`
+  - fix: Place the sidebar toggle as a stock toolbar Button (or rely on NavigationSplitView's built-in toggle) with no surrounding stroked container; remove the custom border/background overlay.
+  - test: both
+- **[Status bar]** Disabled-state explanation text is buried inside an iconOnly Label (dead string)
+  - rule (charter): NO FAKE UI / honesty: status strings must communicate real state to the user; here the explanation is rendered into a Label that is then hidden by `.iconOnly`, so the user never sees it and VoiceOver does not get it as the label either.
+  - fix: Drive the user-facing explanation through `.accessibilityLabel`/`.accessibilityHint` and the tooltip, not through Label text that `.iconOnly` deletes. Use a single clear `.accessibilityLabel("Open Source Folder")` plus `.accessibilityHint("
+  - test: source-scan
+- **[Status bar]** Borderless icon buttons in a 28px strip risk sub-minimum hit targets
+  - rule (HIG): HIG Pointer/Layout: controls should provide an adequate click target; a 28px-tall footer with `.buttonStyle(.borderless)` icon-only buttons and no `.controlSize`/min frame can yield targets below the comfortable minimum and crowd the adjace
+  - fix: Give the buttons a defined hit area, e.g. `.controlSize(.small)` and/or `.frame(width: 22, height: 22)` with `.contentShape(Rectangle())`, and verify the rendered tap region in a peekaboo run against Finder's footer controls.
+  - test: e2e-peekaboo
+- **[Status bar]** Folder buttons are absent from the design SSOT (layout drift)
+  - rule (SSOT): Design SSOT: any Swift screen must match its HTML counterpart; drift > 3% is a release blocker. The spec status bar contains only the counts group and the right-aligned mono path.
+  - fix: Either update design/project/app.jsx + styles.css to include the two footer buttons (preferred — folder-open is a real, useful Finder-like affordance) so spec and app agree, or remove them from Swift. Reconcile so drift is under 3%.
+  - test: source-scan
+- **[Design tokens (cross-cutting) / color]** Status colors green/amber/red hardcoded instead of system semantic .green/.orange/.red
+  - rule (charter): Charter § Colour (inherit Apple's palette); HIG (macOS) Color: use system colors (systemGreen/systemOrange/systemRed) which adapt across appearances and accessibility (increase contrast) settings.
+  - fix: Replace DesignColor.green/amber/red with Color.green / Color.orange / Color.red (SwiftUI's system-backed colors). Map status enums to these directly.
+  - test: source-scan
+- **[Design tokens (cross-cutting) / color]** OKLCH-to-sRGB approximation comment admits unverified color drift vs SSOT (>3% blocker risk)
+  - rule (SSOT): Charter § Design reference: "Any Swift screen must match its HTML counterpart pixel-for-pixel — drift > 3% is a release blocker."
+  - fix: If the chosen direction is to keep custom tokens, run scripts/colors-from-css.swift to compute exact sRGB from the OKLCH literals and assert <3% delta. Better: replace surface/status tokens with system semantics (above), which makes the OKL
+  - test: source-scan
+- **[Design tokens (cross-cutting) / typography]** DesignFont uses fixed point sizes (Font.system(size:)) instead of semantic text styles (Dynamic Type)
+  - rule (charter): Charter § Typography: "system fonts (.system, .headline, .subheadline, .callout, .footnote) at system sizes; never a hand-rolled tracking/weight stack pretending to be SF Pro." HIG (macOS) Typography: prefer built-in semantic text styles so
+  - fix: Map tokens to semantic styles: ui → .body (or .callout), uiSmall/label → .footnote, displayName → .headline, cap10 → .caption2, mono → .body.monospaced(). Use .font(.headline) etc. at call sites.
+  - test: source-scan
+- **[Sidebar]** 'Single Files' row is hidden when empty, contradicting its own documented contract
+  - rule (SSOT): Internal SSOT/contract consistency + HIG sidebar stability (sidebar item presence should be predictable, not flicker in/out based on transient counts).
+  - where: `Sources/Views/SourceSidebar.swift:19 vs Sources/Models/Batch.swift:9-14`
+  - fix: Pick one source of truth. If the KISS 'hide when empty' behavior is intended, update the Batch.swift:9-14 T13 comments to match. If the documented 'always render' contract holds, drop the count guard at SourceSidebar.swift:19. The implement
+  - test: source-scan
+- **[Sidebar]** Sidebar rows have no right-click context menu, breaking Finder-parity charter
+  - rule (charter): Charter: 'Finder, but for background removal' — Finder source-list rows offer a right-click context menu (Open, Reveal, Remove). HIG macOS: provide contextual menus for list/sidebar items where actions apply.
+  - where: `Sources/Views/SourceSidebar.swift:25-30`
+  - fix: Add .contextMenu to each batch row with stock Buttons: 'Open in Finder' (calls FolderOpener with batch.rootURL, disabled when nil per Single Files), 'Remove from List'. Use stock .contextMenu — no hand-rolled menu.
+  - test: e2e-peekaboo
+- **[Sidebar]** Folder batch rows lack a VoiceOver accessibility label that disambiguates count vs name
+  - rule (a11y): Accessibility authority #4: every interactive element needs an accessibility label/role; HIG accessibility: badges must be conveyed to VoiceOver, not just shown visually.
+  - where: `Sources/Views/SourceSidebar.swift:21-28`
+  - fix: Add .accessibilityLabel("\(batch.name), \(batch.imageCount) images") to each batch row and "All Files" to the library row, so the badge count is spoken. Stock SwiftUI modifier.
+  - test: source-scan
+- **[Inspector / Run History]** Date renders with mixed locale formatting ('7. June 2026')
+  - rule (HIG): HIG Typography/Localization & label clarity: dates should use the user's locale format consistently, not a hybrid (German ordinal-dot + English month)
+  - fix: Use a single explicit Date.FormatStyle (e.g. .dateTime.day().month(.wide).year()) under one locale, or rely on a consistent system locale so the day/month/year style is internally coherent.
+  - test: e2e-peekaboo
+- **[Tweaks panel (debug/demo harness)]** Dark/black filled action buttons instead of stock button styles in a light app
+  - rule (charter): Charter: use real .bordered/.borderedProminent styles, never custom rectangles imitating them; light-design preference. HIG: standard push buttons adopt system styling/accent.
+  - where: `build/screenshots/audit/07-debug-drag-blocked.png`
+  - fix: Use stock Button with .buttonStyle(.bordered) (or .borderedProminent for the primary), letting the system render fill/accent. Remove any custom black background. (Best fix: these buttons are part of the demo harness and should be deleted wi
+  - test: source-scan
+- **[DropVeil (blocked / 'Nothing to add')]** Error glyph is a circle-with-X instead of the spec's circle-with-single-slash
+  - rule (SSOT): SSOT drift > 3% is a release blocker. app.jsx blocked glyph = circle + ONE diagonal stroke (prohibition mark), not an X.
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/design/project/app.jsx:186`
+  - fix: Match the spec: render a circle with a single diagonal slash. In stock SwiftUI use Image(systemName: "nosign") (circle + single slash) tinted .red, rather than xmark.circle. Pick the SF Symbol that matches the spec glyph.
+  - test: both
+- **[DropVeil (blocked / 'Nothing to add')]** Centered modal 'Nothing to add' card is a non-Finder invalid-drop affordance
+  - rule (charter): Charter 'Finder eyeball test' + 'Drop affordance: the same blue rounded-rect inset highlight Finder uses'. Finder signals an invalid drop with the no-drop cursor badge and by NOT highlighting the target — not a centered modal card.
+  - where: `build/screenshots/audit/07-debug-drag-blocked.png`
+  - fix: For invalid drops, return [] / refuse from the .onDrop validation so the system shows the no-drop cursor, and simply do not highlight the drop target; reserve any inset highlight for valid drags. If a hint is kept, demote it to a subtle sta
+  - test: e2e-peekaboo
+- **[Mask refinement vs Foreground transforms / Background — inconsistent row grouping]** Toggle+control rows are inconsistently wrapped: some in a VStack, expand/contract/translate/flip are bare siblings
+  - rule (HIG): HIG Layout (consistency) + Forms: related controls that form one logical row should be grouped consistently so the toggle and its dependent control read as a unit and align predictably.
+  - fix: Wrap each toggle+dependent-control in `VStack(alignment:.leading, spacing:4)` exactly as featherRow does, so all rows share one grouping/spacing convention.
+  - test: source-scan
+- **[Advanced — full filter chain (validation field)]** Hand-rolled RoundedRectangle error ring overlaid on a .roundedBorder TextField (mismatched custom chrome)
+  - rule (charter): Charter: standard SwiftUI primitives only, no custom-painted chrome imitating system controls; corner radius must match the real control. SSOT/HIG: error state should use the system field's own focus/validation affordance.
+  - fix: Drop the overlay; signal the error via the existing Label(err) message plus .accessibilityLabel, or use a stock container (e.g. a GroupBox/border tinted with .tint) rather than re-stroking the field. If a tint is needed use the system field
+  - test: source-scan
+- **[Mask refinement / all disclosure sections (ClickRowDisclosure)]** Custom hand-rolled disclosure replaces stock DisclosureGroup with a manually painted chevron
+  - rule (charter): Charter: "Hand-rolled ... list separators, hand-rolled context menus. SwiftUI ships all of these" — and stock primitives only; DisclosureGroup is the stock disclosure control.
+  - fix: Replace with stock `DisclosureGroup(title, isExpanded: $isExpanded) { content }`. If full-row tappability is the genuine reason, document the platform limitation per charter and at minimum use a semantic font for the chevron, not a hardcode
+  - test: source-scan
+- **[File table]** Tappable text inside a Table cell creates an inconsistent, undiscoverable hit target
+  - rule (HIG): HIG Lists and tables / Pointer: row activation should be predictable; a single in-cell tap target that diverges from row selection is a hidden affordance. Charter: don't hand-roll interactions the Table already provides.
+  - fix: Remove the onTapGesture; rely on the row's primaryAction (double-click) and the existing context-menu "Open Cutout" item, which are the discoverable, keyboard- and VoiceOver-reachable paths.
+  - test: source-scan
+- **[File table]** Delete key bypasses the destructive-confirmation dialog for selections under 10 items
+  - rule (HIG): HIG Modality / destructive actions; Charter: native .confirmationDialog for destructive ops. Inconsistent guarding of a destructive keyboard path.
+  - fix: Either always route destructive removal through the .confirmationDialog, or provide undo (NSUndoManager / a toast with Undo). Don't split behavior by count without an undo affordance.
+  - test: e2e-peekaboo
+- **[File table]** Keyboard handling reimplemented in a hidden NSView instead of stock SwiftUI/Table keyboard support
+  - rule (charter): Charter: "Standard SwiftUI primitives only — no custom-painted OS chrome ... hand-rolled focus rings ... SwiftUI ships all of these." HIG keyboard: respect standard table key handling.
+  - fix: Prefer SwiftUI `.onKeyPress(.space/.return/.deleteForward)` (or `.keyboardShortcut`) attached to the Table, and let the Table keep first-responder so arrow navigation and type-select work. If QLPreviewPanel control truly needs an NSResponde
+  - test: both
+- **[Modals / File pickers (fileImporter + NSOpenPanel)]** Two divergent file-picker mechanisms; NSOpenPanel bypasses the stock SwiftUI .fileImporter the charter prefers
+  - rule (charter): Charter 'Sheets / dialogs: native .sheet, .alert, .fileImporter — never a custom modal' and 'STOCK SwiftUI primitives only'. SaveToRow and ConfigPanel use `.fileImporter`; addFiles() uses a raw AppKit `NSOpenPanel().runModal()`. Mixing two 
+  - fix: Prefer `.fileImporter(isPresented:allowedContentTypes:allowsMultipleSelection:)` for the Add Files flow too, so all pickers are the same stock SwiftUI sheet. If NSOpenPanel is retained for multi-select ergonomics, document the rdar/rational
+  - test: source-scan
+- **[Modals / Color picker entry via segmented Picker]** Selecting 'Image' in the segmented Picker silently opens a file-import modal as a side effect of a selection change
+  - rule (HIG): HIG modality: a modal should be presented in response to a clear user request, and a segmented control's selection is a state toggle, not a 'present a dialog' command. Triggering a fileImporter from the binding's setter couples selection to
+  - fix: Set the segment selection only after a successful import, or present an explicit 'Choose…' button (as the .image branch already shows at ConfigPanel.swift:42) and handle the .failure/cancel case by restoring the prior background case.
+  - test: both
+- **[Inspector / Config panel section headers]** Custom ClickRowDisclosure replaces the stock SwiftUI DisclosureGroup for collapsible sections
+  - rule (charter): Charter: 'Standard SwiftUI primitives only — no custom-painted OS chrome. Hand-rolled context menus / disclosure machinery forbidden; SwiftUI ships all of these.' Stock disclosure is DisclosureGroup.
+  - fix: Use stock DisclosureGroup(title){...} with .disclosureGroupStyle, or if the whole-row hit target is genuinely needed, document the platform limitation; do not hand-roll the chevron+toggle. Section titles should use .headline on a real Discl
+  - test: source-scan
+- **[Inspector / Config panel — Advanced filter chain]** Advanced 'full filter chain' exposes raw CLI DSL (mask:feather=8;fg:outline=...;bg:grayscale) in a code textarea — leaks the terminal the Golden Goal forbids
+  - rule (charter): Golden Goal: 'Never touch a terminal.' Charter 'Finder eyeball test': nothing should look crafted/developer-facing. A raw mono DSL textarea is the opposite of the Finder feel and duplicates the GUI controls above it.
+  - fix: If a power-user escape hatch is required, hide it behind a stock advanced toggle/menu, label it plainly, and ensure it never appears in the default Finder-like view. Confirm it is part of the SSOT before shipping; presently it is not.
+  - test: source-scan
+- **[Toolbar]** No accessibilityLabel/role on the bordered-prominent Run all/Stop button
+  - rule (a11y): HIG Accessibility: every control must expose a VoiceOver label and, for toggles, a value/state. The Run all/Stop button changes meaning by state and needs an explicit label; relying on the changing text is acceptable for the label but the t
+  - fix: Keep the text title as label, but verify VoiceOver announces state; if needed add .accessibilityLabel(viewModel.activeRun != nil ? "Stop" : "Run all"). At minimum ensure no icon-only ambiguity (this one is text, so label is fine once identi
+  - test: e2e-peekaboo
+- **[Toolbar]** Primary button omits the pending count the SSOT requires ("Remove background from N")
+  - rule (SSOT): SSOT: the primary action surfaces the live count of files to process; the charter forbids labels that don't reflect real state but also requires fidelity to the spec's informative label.
+  - fix: Interpolate the count into the toolbar label: Text("Remove background from \(viewModel.files.count)") or the pending subset, matching the spec.
+  - test: source-scan
+- **[Toolbar]** All three toolbar items use .primaryAction, flattening importance ordering
+  - rule (HIG): HIG (macOS toolbars): order toolbar items by importance/frequency and reserve the trailing primary-action slot for the single most important action; place the inspector/sidebar toggle in its own region, not in primaryAction.
+  - fix: Move the inspector toggle to a distinct placement (e.g. ToolbarItem(placement: .automatic) trailing, or use a dedicated .navigation/.primaryAction split). Keep only Add Files… and the process button as .primaryAction so the prominent button
+  - test: source-scan
+- **[Missing-binary state]** Copy button gives no feedback or accessibility state on success
+  - rule (a11y): HIG Accessibility: interactive controls must convey state to VoiceOver; HIG feedback: confirm the result of an action. Copying silently leaves the user (and VoiceOver) unaware anything happened.
+  - fix: Track a @State copied flag, swap label to 'Copied' with a brief reset, and post an .accessibilityAction / AccessibilityNotification.Announcement('Copied to clipboard'). (Moot if the brew row is removed per the lying-label finding.)
+  - test: both
+- **[Missing-binary state]** Typography uses hand-rolled numeric point sizes instead of system text styles
+  - rule (charter): Charter: 'system fonts (.system, .headline, .subheadline, .callout, .footnote) at system sizes; never a hand-rolled tracking/weight stack' (CLAUDE.md:27).
+  - fix: Map to semantic styles: title -> .title2/.headline, body -> .body, brew code -> .body.monospaced(), hints -> .footnote, paths -> .caption.monospaced().
+  - test: source-scan
+- **[Window chrome (cross-cutting)]** Design SSOT draws a fake title bar with fake traffic-light dots — must NOT be ported to SwiftUI (verify the app uses real NSWindow chrome)
+  - rule (charter): Charter "NO FAKE CHROME": "No SwiftUI Circle().fill(.red/.yellow/.green) traffic lights. No custom 44px title bar view. Use the real NSWindow chrome ... App-in-an-app is an automatic release blocker."
+  - fix: No code change to Sources/. Add a source-scan test asserting Sources/ contains NO `Circle().fill(.red`/`.yellow`/`.green`, no `DesignRadius.window` applied to a window-level view, and no custom titlebar VStack. Document in the design SSOT t
+  - test: both
+- **[Debug overlay (dev)]** Hardcoded white opacity backgrounds and selection fill break in Dark Mode
+  - rule (charter): Charter: use system materials / semantic colors. HIG (Color/Dark Mode): never hardcode white/black; use semantic colors and materials so surfaces adapt to appearance.
+  - fix: Use `.background(.thinMaterial, in: RoundedRectangle(...))` for inset fields/log; use `.fill(Color.accentColor.opacity(0.15))` or `.selection` for the active row; drop the white stroke or use `.separator`/`Color(nsColor: .separatorColor)`. 
+  - test: both
+- **[Debug overlay (dev)]** Phase-force rows and mini buttons fall below HIG minimum hit-target height
+  - rule (HIG): HIG (Inputs / pointer targets): give controls a comfortable minimum hit area. Tap/click targets should be at least ~28pt; the phase rows here are ~20pt tall.
+  - fix: Use stock controls with default `.controlSize` (which meet minimums) or raise row/button height to >=28pt (`.frame(minHeight: 28)`). Peekaboo e2e: assert clickable bounds height >= 28pt.
+  - test: e2e-peekaboo
+- **[Debug overlay (dev)]** Custom-painted panel chrome (RoundedRectangle frame + manual shadow) imitates an app-in-an-app floating window
+  - rule (charter): Charter: "No floating panels-in-panels", "no custom shadow", "App-in-an-app ... is an automatic release blocker"; use real NSWindow/stock surfaces. Even the design spec's TweaksPanel marks itself `data-omelette-chrome` (host chrome), not ap
+  - fix: If retained in DEBUG only, present it as a real auxiliary `Window`/`.inspector`/`.popover` (real NSWindow chrome) rather than a hand-painted floating card; drop the manual stroke + shadow. Best fix: strip from shipping per the blocker, so t
+  - test: source-scan
+- **[Dual preview / zoom controls]** Zoom +/−/reset buttons below HIG minimum hit-target
+  - rule (HIG): HIG (macOS pointer/hit-target): controls should present an adequately sized hit region (≈28pt min for comfortable mouse targeting). Tiny plain-glyph buttons packed in a compact capsule are hard to hit.
+  - fix: Give each Button its own padded contentShape (e.g. `.frame(minWidth:28,minHeight:28).contentShape(Rectangle())`) or use `.controlSize(.large)` with `.buttonStyle(.borderless)`; keep the capsule but ensure each segment is independently ≥28pt
+  - test: e2e-peekaboo
+- **[Tweaks / Debug panel — overall chrome]** Panel paints its own border, shadow and white hairline rather than presenting as a stock popover/inspector
+  - rule (charter): Charter: 'hand-rolled focus rings, hand-rolled list separators… SwiftUI ships all of these' and 'don't build a brand, inherit Apple's.' HIG (Popovers/Materials): use system popover chrome and .separator, not custom strokes.
+  - fix: Present the panel as a real .popover or as an Inspector column; drop the custom white-stroke overlay and manual shadow (popovers get system chrome free) and replace DesignColor.border dividers with stock Divider().
+  - test: source-scan
+- **[Tweaks / Debug panel — phase list]** Force-phase list is a stack of custom plain Buttons with a hand-painted selection fill instead of a stock selectable List
+  - rule (charter): Charter 'Finder, but for background removal': single-select navigation should use real List/Table selection, not a LazyVStack of buttons with manual highlight. HIG (Lists/Selection): selected rows use system selection styling.
+  - fix: Use a List(selection:) with .listStyle(.inset) or a Picker(.inline); let the system render selection highlight and the checkmark, removing the manual fill.
+  - test: both
+- **[Tweaks / Debug panel — section labels & log text]** Low-contrast micro-typography (10–10.5pt uppercase mute-gray) risks failing WCAG AA
+  - rule (a11y): Accessibility authority #4 / WCAG AA: text must meet 4.5:1 (small text). HIG typography: avoid sub-11pt body text.
+  - fix: Use .font(.caption)/.footnote with .foregroundStyle(.secondary) (system semantic color, which adapts contrast) and avoid sub-11pt; let the material+semantic color pairing guarantee AA.
+  - test: both
+- **[Tweaks / Debug panel — close (xmark) button]** Icon-only close button hit target is below the HIG minimum
+  - rule (HIG): HIG (pointer/hit-target sizing): controls should present at least a ~28pt (ideally 44pt) hittable area; macOS minimum touch/click target.
+  - fix: Give it .frame(width: 28, height: 28) (or use a stock toolbar/borderless Button which carries adequate padding) and .contentShape(Rectangle()) so the whole frame is clickable.
+  - test: source-scan
+- **[Drop affordance / DropVeil]** Folder name shown as plain inline text, not the monospaced chip the design specifies
+  - rule (SSOT): SSOT: the folder name uses the `.hint-em` style (styles.css:434-443) — monospaced font, accent-tinted background, 1px 7px padding, 5px border-radius (a pill/chip). The Swift veil renders the name as plain body text inside the primary string
+  - fix: Compose the headline from multiple Text runs and give the name a chip: a separate `Text(folderName).font(.system(.callout, design: .monospaced)).padding(.horizontal,6).padding(.vertical,1).background(.tint.opacity(0.12), in: RoundedRectangl
+  - test: both
+- **[Drop affordance / DropVeil glyph]** Glyph lacks the circular tinted backing chip from the design
+  - rule (SSOT): SSOT: `.drop-veil-glyph` (styles.css:419-424) is a 64x64 circle filled with `color-mix(currentColor 10%, white)` holding the icon. The Swift version draws a bare SF Symbol with no circular backing, so the icon floats. Layout drift on a prim
+  - fix: Wrap the symbol: `.frame(width:64,height:64).background(.tint.opacity(0.1), in: Circle())` before applying the foreground tint, matching the 64x64 / 10% mix spec.
+  - test: both
+
+### LOW (67)
+
+- **[Ingest overlay]** Recently-found path rows fade decoratively via opacity, hurting contrast/readability
+  - rule (a11y): a11y WCAG AA: text must meet contrast minimums; HIG: don't reduce legibility of meaningful content for decoration.
+  - fix: Keep full opacity (or fade only the oldest single row), or use `.foregroundStyle(.secondary)`/`.tertiary` semantic tiers instead of arbitrary opacity multipliers that compromise contrast.
+  - test: source-scan
+- **[Menu bar / shortcuts]** Cmd-Shift-A bound to a custom "Deselect All" command with no design-spec basis and nonstandard semantics
+  - rule (SSOT): HIG Keyboards: "Define custom keyboard shortcuts for only the most common actions" and respect platform conventions. macOS has no system-standard Cmd-Shift-A; Apple's own apps vary, so assigning it to Deselect All is a nonstandard app-speci
+  - fix: Keep the Deselect All menu item for completeness but reconsider the Cmd-Shift-A shortcut; if retained, expose it visibly in the Edit menu (it already is) and document it. Acceptable to keep given Cmd-A selects, but verify it does not shadow
+  - test: source-scan
+- **[Menu bar pruning]** Pruner deletes whole top-level menus when they become empty, reducing command discoverability
+  - rule (charter): HIG The Menu Bar: standard menus give users a predictable place to find commands; aggressively removing top-level menus (e.g. View) departs from the "standard Apple app, like Finder" charter north star and hurts discoverability.
+  - fix: Keep a minimal View menu with real items ("Show/Hide Inspector" ⌥⌘I, "Show/Hide Sidebar" ⌃⌘S) via `CommandGroup(after: .sidebar)` so the visible toolbar toggles also have discoverable, shortcut-bearing menu equivalents — matching Finder.
+  - test: e2e-peekaboo
+- **[Inspector / Config]** Selecting Background = Image with no prior image leaves state unchanged when picker is cancelled
+  - rule (heuristic): Heuristic / state-correctness: a segmented control selection should reflect the user's choice or revert cleanly. Choosing "Image" opens the importer but never commits .image until a file is picked, so cancelling the importer leaves the segm
+  - fix: Acceptable to keep (no half-state committed), but make it explicit: on importer cancel, no-op is fine; ensure the segmented control's bound value is computed (it is) so it visibly reverts. Optionally show a brief inline hint. Guard the reve
+  - test: e2e-peekaboo
+- **[Inspector / Config panel]** Background-filter section header is sentence-redundant with its checkboxes ('... background' repeated)
+  - rule (HIG): HIG (macOS, Labels/Controls): 'Avoid repeating words from a group label in each control label.' Once a section is titled 'Background filters', each control should read 'Grayscale', 'Blur', 'Desaturate' — not 'Grayscale background', 'Blur ba
+  - fix: Shorten the Toggle labels to Toggle("Grayscale"), Toggle("Blur"), Toggle("Desaturate") since the enclosing 'Background filters' group already establishes the noun.
+  - test: source-scan
+- **[File list table (visible behind the color panel)]** StatusPill "Not removed" dot uses .secondary — borderline contrast on the focused-selection blue row
+  - rule (a11y): WCAG AA 1.4.11 non-text contrast (>=3:1 for meaningful graphics); HIG selection legibility.
+  - fix: On the selected/focused row, status glyphs in a Table should use .foregroundStyle(.primary) or rely on the system's selection-foreground (Table normally inverts row content to white when focused); verify the dot inherits the selection foreg
+  - test: e2e-peekaboo
+- **[Inspector / Advanced chain editor — placeholder vs example mismatch]** Placeholder syntax in code uses ':' but the audited state caption uses ';' — example is internally inconsistent
+  - rule (charter): Charter: 'No aspirational labels … Every status string must be derived from real state' / labels must be truthful and consistent. SSOT: copy must be exact.
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/Views/Settings/AdvancedChainEditor.swift:29`
+  - fix: Make the visible placeholder exactly equal to a string that FilterChainParser.parse accepts, and keep the audit caption in sync; add a test asserting the placeholder example parses without error.
+  - test: source-scan
+- **[Context menu (right-click on file row)]** Top menu item "Process This Only" uses a magic-wand-and-sparkles glyph that implies AI/magic processing
+  - rule (charter): Charter "NO FAKE UI": no aspirational labels/art; the app is a thin GUI over the bgbgone CLI and must not imply on-device AI magic. HIG menus: menu-item icons should describe the action literally, not decoratively.
+  - fix: Swap the icon to a neutral, literal action glyph for stock SwiftUI, e.g. Button("Process This Only", systemImage: "play.fill") or "sparkle"-free "scissors"/"wand.and.rays"-free choice like "play.circle"; keep it a plain stock Button in the 
+  - test: both
+- **[Context menu (right-click on file row)]** "Remove from Queue" destructive item is not visually distinguished (renders in default black text)
+  - rule (HIG): HIG (menus): destructive actions should be clearly distinguishable. Charter mandates stock SwiftUI roles. SwiftUI provides role: .destructive specifically to differentiate removal actions.
+  - fix: Keep role: .destructive (correct stock idiom). If stronger differentiation is wanted within stock constraints, this is the platform's own behavior and acceptable; otherwise no further custom coloring should be added (custom red text would v
+  - test: both
+- **[Status bar / footer]** Drift from SSOT: design status bar has no folder/tray buttons (extra controls added in Swift)
+  - rule (SSOT): SSOT design/project/app.jsx StatusBar is the spec; drift > 3% is a release blocker. The Swift footer adds two controls the spec does not contain.
+  - fix: Either update the SSOT (app.jsx/styles.css) to include the two Finder-style accessory buttons so spec and app agree, or remove them from StatusBar.swift. Given the 'Finder footer' intent, updating the spec is the better path — but the drift
+  - test: source-scan
+- **[Status bar / footer]** Background/border drift: spec uses solid bg-pane + border-soft hairline; Swift uses .regularMaterial + .separator
+  - rule (SSOT): SSOT styles.css:663-669 specifies the footer surface (background: var(--bg-pane); border-top: 1px solid var(--border-soft)); drift > 3% is a blocker. Charter, however, prefers system materials.
+  - fix: This is the rare case where charter (use system materials) and SSOT (solid pane) conflict. Resolve by updating the SSOT to call for a translucent material footer (matching Finder), keeping the Swift `.regularMaterial` + `.separator` which i
+  - test: source-scan
+- **[Context menu (right-click)]** Inconsistent ellipsis usage: disabled "Add files…" has an ellipsis but no dialog-opening item among the real actions
+  - rule (HIG): HIG Menus: "Use an ellipsis when a menu command opens a window/dialog or requires additional information." Ellipsis must signal a follow-up UI; here it is on a dead button while genuinely dialog-opening behavior (Remove confirmation) carrie
+  - where: `Sources/Views/FileListView.swift:186`
+  - fix: If Remove is routed through the confirmation dialog (see destructive finding), give it an ellipsis: "Remove from Queue…". Drop the ellipsis from "Add files" unless it actually opens a fileImporter dialog (it should, per the previous finding
+  - test: source-scan
+- **[Context menu (right-click)]** "Reveal Cutout" / "Open Cutout" / "Copy Cutout Path" become silently disabled with no explanation when no cutout exists
+  - rule (HIG): HIG Menus: disabled items should be understandable; for first-time users a row that has not been processed shows three greyed cutout actions with no hint why. Combined with the no-identifier issue this is an unlabeled disabled state.
+  - where: `Sources/Services/FileRowActions.swift:46-51`
+  - fix: Add `.help("No cutout yet — process this image first")` (NSMenuItem toolTip) and an accessibilityHint to the cutout actions when disabled, or hide cutout actions entirely until a cutout exists per HIG's "hide never-relevant commands" guidan
+  - test: e2e-peekaboo
+- **[Inspector header]** Status redundancy: 'Not removed' shown twice for the same file
+  - rule (heuristic): HIG Layout/clarity: avoid presenting the same state twice in one viewport; it adds noise without information. SSOT spec parity (Finder shows status once).
+  - fix: Drop the StatusPill from the inspector header when the same file is already the highlighted/selected row in the table, or differentiate (table = list status, inspector = last-run detail). Keep one stock pill.
+  - test: e2e-peekaboo
+- **[Inspector / Name as]** Token chips {name}/{ext}/{n:02} are bordered Buttons — verify hit target meets HIG minimum
+  - rule (HIG): HIG Pointer/hit-target: controls should meet the minimum comfortable click target; .controlSize(.small) bordered buttons can fall below it.
+  - fix: Drop .controlSize(.small) (use default/.regular) or add explicit horizontal padding so each chip's hit area is comfortable; keep stock .bordered Button.
+  - test: source-scan
+- **[Run history / spec]** Surface has no counterpart in the design SSOT — drift unverifiable
+  - rule (SSOT): Charter "design/project/bgbgone.html ... is the spec for layout, color, copy, and interaction ... drift > 3% is a release blocker."
+  - fix: Add a Run History state to bgbgone.html specifying row layout, status copy ("Success"/error code), and the status color/icon, then reconcile the Swift view to it; until then this surface cannot be held to the 3% drift gate.
+  - test: source-scan
+- **[Run history / list ordering]** Possible double-reversal: store doc says newest-first, view reverses again
+  - rule (heuristic): Heuristic — visible ordering must match documented/real state (charter: "Every number on screen comes from real state").
+  - fix: Verify RunHistoryStore.entries(for:) ordering; render in the documented order without an ad-hoc `.reversed()` (sort explicitly by `startedAt` descending so order is intentional and testable).
+  - test: both
+- **[Inspector / Run History]** "Run History" header shown but empty-state copy is bland and low-contrast
+  - rule (heuristic): HIG (Empty states / Layout): empty sections should give a clear, legible explanation; secondary text must still meet WCAG AA contrast. "Finder eyeball test" — stock apps phrase empty states helpfully.
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/Views/Inspector/RunHistoryView.swift`
+  - fix: Use ContentUnavailableView (or .foregroundStyle(.secondary) rather than tertiary) for the empty Run History so the message meets AA contrast and reads as a deliberate stock empty state.
+  - test: both
+- **[Inspector / selected-file status]** "Not removed" status uses .secondary grey — ambiguous between disabled and actionable
+  - rule (heuristic): HIG (Color / status): status indicators should be distinguishable and not read as disabled; the dot+label pattern must clearly communicate the actionable "needs processing" state.
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/Views/SelectedMeta.swift:82`
+  - fix: Keep stock semantics but use a clearer affordance for .raw — e.g. an SF Symbol like circle (outline) with .secondary, paired with the prominent "Remove background from N" action — so grey reads as 'pending', not 'disabled'. No custom painti
+  - test: source-scan
+- **[Inspector / Config — copy consistency]** Mixed spelling: segment label "Color" vs row label "Colour"
+  - rule (heuristic): HIG (Writing/labels) + charter "label clarity & truthfulness": copy must be internally consistent. Charter/code already uses British "Colour" for the row label.
+  - fix: Pick one locale spelling. Change the segment Text("Color") in ConfigPanel.swift:21 to "Colour" (or change the row label to "Color") so both match.
+  - test: source-scan
+- **[Dual preview]** Floating ±/⟲ control glyph for zoom-in differs from spec intent and capsule chrome is unspecced
+  - rule (SSOT): SSOT drift: the floating zoom capsule (and its SF Symbols / thinMaterial Capsule + .separator overlay) has no entry in styles.css/app.jsx for the dual view; drift > 3% blocker.
+  - fix: Same reconciliation as the zoom/pan finding: add the floating control to the SSOT or remove it. If retained, the chrome itself (thinMaterial Capsule, .separator border) is acceptable stock SwiftUI, so the fix is spec-side, not code-side.
+  - test: source-scan
+- **[Dual preview]** Corner-label capsule re-styles the pane tag; SSOT tag is plain faint uppercase text with no material chip
+  - rule (SSOT): SSOT spec for `.dual-tag` is plain text (no background chip); drift > 3% blocker. Charter: don't invent chrome the spec doesn't have.
+  - fix: Render the tag as plain `Text(...).font(.caption2).foregroundStyle(.secondary).textCase(.uppercase).tracking(...)` at 14pt-equivalent inset, dropping the thinMaterial Capsule, to match `.dual-tag`. Or add the chip to the SSOT if the chip is
+  - test: source-scan
+- **[Debug Tweaks panel (visible on screen)]** Section labels use manual tracking and hand-rolled white-opacity selection fills
+  - rule (charter): Charter: system fonts and system semantic colors; no custom-painted chrome. SectionLabel applies .tracking(0.6) and the active phase row paints Color.white.opacity(0.7) as a selection chip instead of a stock selection/material.
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/Views/DebugOverlay.swift:87`
+  - fix: Drop manual tracking (use .font(.caption.smallCaps()) or a plain .footnote secondary label); render the active row with a stock selection (e.g. List with selection, or .background(.selection)) instead of a white-opacity rectangle.
+  - test: source-scan
+- **[Ingest overlay / copy truthfulness]** '1 items checked' has an ungrammatical singular/plural mismatch
+  - rule (charter): Charter + HIG (label clarity & truthfulness): labels must read correctly; '1 items' is grammatically wrong for a count of one.
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/Views/DropOverlays.swift:72`
+  - fix: Pluralize via inflection: Text('^[\(state.scannedCount) item](inflect: true) checked') and likewise for 'images found', so '1 item checked' / '2 items checked' render correctly.
+  - test: both
+- **[File list / Table (column header)]** Status column header truncated to 'Size' / no visible sort affordance
+  - rule (HIG): HIG (macOS Tables) — column headers should be legible and, for a Finder-like Table, sortable with a visible sort indicator. Charter: 'real Table (column headers, sortable)'.
+  - fix: Use Table with TableColumn(value:) sort comparators so SwiftUI renders the native sort chevron; ensure the Size column has enough width or is right-aligned so its header is not clipped.
+  - test: e2e-peekaboo
+- **[Inspector / Format & Background segmented controls]** Uneven segment widths with visible inner pipe dividers ('HEIC | TIFF' crammed)
+  - rule (heuristic): HIG Controls/Layout: segmented controls should read as evenly grouped; cramped unequal segments hurt hit-target consistency and look non-stock.
+  - fix: Drop .fixedSize() and let the segmented Picker fill its row (or wrap each in equal-width segments) so all segments are evenly sized and meet a consistent hit target; align width with the SSOT grid column.
+  - test: e2e-peekaboo
+- **[DropVeil / drag overlay (many images)]** Primary label font size/style drifts from spec (.title3 vs 18px display medium)
+  - rule (SSOT): SSOT typography: styles.css:426-429 .drop-veil-primary is font:500 18px/1.25 var(--font-display) with letter-spacing -0.01em and color var(--fg). Charter also mandates system fonts only.
+  - fix: Use .font(.system(size:18, weight:.medium)) (system font, matches 18px/500) or .title2 to better hit the spec's 18px display size; keep .foregroundStyle(.primary).
+  - test: source-scan
+- **[Empty state (file-list overlay)]** Icon glyph drifts from SSOT: SF Symbol tray.and.arrow.down vs spec custom 'drop' (downward-arrow-into-folder) glyph
+  - rule (SSOT): SSOT spec parity for the empty-state icon. app.jsx:453 uses Icon name="drop" (a folder-with-down-arrow path, app.jsx:27); the Swift code substitutes a different SF Symbol (a tray).
+  - fix: Pick the SF Symbol whose silhouette matches the spec's folder+down-arrow (e.g. `arrow.down.doc` or `folder` with a download connotation). Keep it a stock SF Symbol (no custom path drawing — that would itself breach 'no custom-painted chrome
+  - test: both
+- **[Empty state (file-list overlay)]** Empty-state typography uses .title2 / fixed sizes rather than the SSOT display font, and DesignFont hardcodes non-Dynamic-Type sizes
+  - rule (charter): Charter typography rule: system fonts at system sizes. SSOT app.jsx:454 sets the primary line to 500 weight 14px display font; the Swift uses .title2 (~17pt). Charter also forbids a hand-rolled weight/size stack.
+  - fix: Use a semantic text style (e.g. `.headline` or `.title3`) so it tracks Dynamic Type, and size the SF Symbol via `.imageScale`/`.font(.largeTitle)` rather than a hardcoded 56pt. Align weight/size to the SSOT display line within stock styles 
+  - test: source-scan
+- **[Quick Look]** Layout-dependent hardcoded keyCodes for Return/Delete/Space (magic numbers, no symbolic mapping)
+  - rule (heuristic): HIG keyboard / robustness heuristic: key handling should use stable, documented key constants; raw virtual keyCodes are positional and fragile, and obscure intent for the Quick Look trigger path.
+  - fix: Prefer SwiftUI `.onKeyPress(.space)`, `.onKeyPress(.return)`, `.onKeyPress(.delete)` on the Table (stock macOS 14+), or match on `event.charactersIgnoringModifiers`/`NSDeleteCharacter` constants instead of raw keyCodes.
+  - test: source-scan
+- **[Empty state / call-to-action button]** Try Demo hit target below HIG minimum due to .controlSize(.small)
+  - rule (HIG): HIG (pointer/hit targets) & accessibility: interactive controls should meet the platform minimum hit area; a .small control shrinks the button well under a comfortable target for the sole action on the screen.
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/Views/FileListView.swift:155`
+  - fix: Drop .controlSize(.small) (use default/.regular or .large) for the primary empty-state CTA so it meets the standard control height.
+  - test: e2e-peekaboo
+- **[Status bar]** Mono path preview font diverges from SSOT size (caption vs 11.5px)
+  - rule (SSOT): Design SSOT typography: the status strip is `font: 11.5px/1 var(--font-ui)` with the `.mono` path in `var(--font-mono)`; Swift uses `.footnote` (~13pt) for the strip and `.caption.monospaced()` (~12pt) for the path.
+  - fix: Keep system text styles in Swift (charter-correct) and update the SSOT to express the footer in matching system-style sizes (footnote/caption) so the two agree, rather than hardcoding 11.5px.
+  - test: source-scan
+- **[Status bar]** Error-count color uses .red rather than a contrast-checked semantic role
+  - rule (a11y): WCAG AA contrast + HIG color: status text on `.regularMaterial` must meet AA; plain `.red` on a translucent material can fall below 4.5:1 and is not the dynamic system semantic for destructive/error text.
+  - fix: Use a semantic/vibrancy-aware treatment (e.g. `.foregroundStyle(.red)` is acceptable but verify AA on `.regularMaterial`, or pair with `.bold()` + adequate size). Add a peekaboo screenshot contrast check of the failed-count state against AA
+  - test: e2e-peekaboo
+- **[Design tokens (cross-cutting) / color]** Color(hex:) initializer silently returns .clear on bad input (silent failure)
+  - rule (charter): Charter § NO FALLBACKS: "Fail loud." / "Add fallbacks that mask failure" is forbidden.
+  - fix: Make the failure visible in debug (assertionFailure("invalid hex \(hex)")) or return a high-visibility sentinel (.red) in DEBUG; in release keep .clear only if call sites are provably validated. Better: have the hex picker hand over a parse
+  - test: source-scan
+- **[Design tokens (cross-cutting) / color]** Custom DesignRadius corner values instead of system control shapes
+  - rule (charter): Charter § Standard SwiftUI primitives only: use stock control styles/shapes rather than re-deriving OS metrics; HIG layout: adopt standard control corner radii via system controls.
+  - fix: Remove DesignRadius.window — let the real NSWindow own its corner radius. Keep regular/small only for in-content cards, or replace with stock container shapes (RoundedRectangle defaults / .background(in: .rect(cornerRadius:)) tuned to match
+  - test: source-scan
+- **[Sidebar]** Section header copy ('Library' / 'Sources') is not specced in the canonical SSOT
+  - rule (SSOT): SSOT authority #3 governs copy; charter forbids 'aspirational labels' / requires copy derived from spec.
+  - where: `Sources/Views/SourceSidebar.swift:10,16`
+  - fix: Once the sidebar is added to bgbgone.html (per the first finding), define the section header strings there and reference them. Until then this copy is undocumented drift.
+  - test: source-scan
+- **[Sidebar]** Sidebar minimum width 180pt is below the comfortable macOS source-list minimum and risks badge/label truncation
+  - rule (HIG): HIG macOS sidebars / layout: source lists should remain legible at their minimum width; folder names + trailing count badge must not clip.
+  - where: `Sources/Views/SourceSidebar.swift:34`
+  - fix: Raise the minimum toward ~200-220pt, or verify via peekaboo that the longest realistic batch name + badge does not truncate at min width. Keep ideal/max as-is.
+  - test: e2e-peekaboo
+- **[Inspector / Run History]** Ad hoc spacing/padding not aligned to the DesignRadius/spacing scale
+  - rule (SSOT): Design SSOT/consistency: spacing and radii should follow the token scale (DesignRadius 14/8/5); arbitrary values cause >3% drift
+  - fix: Adopt stock List default insets (see List fix) or pull spacing constants from the token scale so the rhythm matches the rest of the inspector.
+  - test: source-scan
+- **[DropVeil (blocked / 'Nothing to add')]** Glyph is missing its soft tinted circular disc background
+  - rule (SSOT): SSOT drift > 3% is a release blocker. styles.css .drop-veil-glyph is a 64px circle filled with color-mix(currentColor 10%, white) behind the icon.
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/design/project/styles.css:419`
+  - fix: Wrap the SF Symbol in a Circle().fill(Color.red.opacity(0.1)) of ~64pt and center the symbol, matching the spec's tinted glyph chip.
+  - test: source-scan
+- **[Foreground transforms / Flip]** Segmented Picker carries a redundant visible "Direction" label under the "Flip" toggle
+  - rule (HIG): HIG Pickers/Labels: avoid redundant labeling; a segmented control whose meaning is already established by the section toggle should not repeat a separate text label that competes with it.
+  - fix: Use `Picker("Flip direction", ...).labelsHidden()` and rely on the toggle as the heading, or drop the toggle label redundancy; either way set an .accessibilityLabel so VoiceOver still announces purpose.
+  - test: e2e-peekaboo
+- **[Settings forms — value sliders]** Sliders have no min/max endpoint labels for non-obvious ranges
+  - rule (HIG): HIG Sliders: when the range or units aren't self-evident, provide min/max value labels (or accessory text) so users understand the scale; a bare track from 0.1×–3.0× or -180°–180° gives no scale cue.
+  - fix: Use the Slider(value:in:) initializer overload that takes `minimumValueLabel:` / `maximumValueLabel:` (e.g. Text("0") / Text("30 px")), a stock SwiftUI affordance.
+  - test: source-scan
+- **[All disclosure section headers (ClickRowDisclosure)]** Disclosure header hit target is below the recommended minimum height
+  - rule (HIG): HIG / AppKit pointer & hit-target sizing: interactive rows should meet the comfortable minimum target; a ~24pt-tall control row is under the recommended ~28pt for reliable pointer/keyboard hit.
+  - fix: Increase to .padding(.vertical, 6) (or set a .frame(minHeight: 28)) so the header row meets the comfortable target height; keep the full-width contentShape.
+  - test: source-scan
+- **[File table]** Cutout thumbnail / Name icon are fixed 22×22 / inline glyphs — below HIG hit/target sizing if treated as actionable
+  - rule (HIG): HIG Accessibility: minimum hit target ~44×44 pt for actionable elements.
+  - fix: Once the in-cell onTapGesture is removed (see prior finding) these become purely decorative and the sizing concern disappears; keep them informational only.
+  - test: source-scan
+- **[File table]** Empty-state overlay condition diverges from sorted/visible data driving the Table
+  - rule (heuristic): Heuristic / charter "every number on screen comes from real state": the empty placeholder must reflect the same set the Table renders.
+  - fix: Gate the whole Table vs emptyState with an `if`/`else` so column headers don't show behind the empty placeholder, matching Finder's empty-folder presentation.
+  - test: e2e-peekaboo
+- **[File table]** Empty-state Try Demo button risks baking in sample data the user could mistake for their work
+  - rule (charter): Charter NO FAKE DATA: "first-launch state is empty — the drop zone, nothing else"; "don't bake in sample/demo files ... anywhere the user might mistake them for their own work."
+  - fix: Confirm startBuiltInDemo only opens documentation/sample in a clearly-labeled sandbox, or remove the button to match the SSOT empty state (drop zone + Add files only).
+  - test: source-scan
+- **[File table]** Context menu 'Add files…' is a permanently-disabled no-op placeholder
+  - rule (charter): Charter NO FAKE UI: "no aspirational labels"; HIG context menus: don't show disabled commands that do nothing.
+  - fix: Either wire the empty-selection context menu "Add files…" to the real file importer used by the toolbar, or omit the item entirely (an empty-selection right-click can show no menu).
+  - test: source-scan
+- **[File table]** Sort comparator for missing dimensions/bytes sorts incorrectly relative to spec ('—' rows)
+  - rule (heuristic): HIG Lists and tables: sorting must be predictable; SSOT shows real dims per row. Charter: numbers reflect real state.
+  - fix: Sort unknown-metadata rows to a consistent end of the list (e.g. via a comparator that orders nil last) so '—' rows don't masquerade as the smallest real files.
+  - test: source-scan
+- **[Modals / Remove-confirm dialog]** Title and message duplicate the same fact; message is redundant with title
+  - rule (HIG): HIG Alerts: the title should be a short, complete-sentence question or statement; the message should add new information, not restate the title. SSOT drift: copy is not specified in the design (no modal copy exists in app.jsx/data.jsx), so 
+  - fix: Trim the message to the only novel, reassuring fact: `Text("Files on disk are not affected.")`. Keep the title as the question.
+  - test: source-scan
+- **[Modals / Remove-confirm dialog]** Confirm button label redundantly repeats the count already in the title
+  - rule (HIG): HIG Alerts/Buttons: button titles should be short verb phrases describing the action (e.g. 'Remove', 'Delete'); the count belongs in the title, not echoed in the button. Stock macOS alerts use a concise verb on the action button.
+  - fix: Shorten the destructive button to `Button("Remove", role: .destructive)` (or 'Remove from Queue'); the count is carried by the title.
+  - test: source-scan
+- **[Inspector / Config panel — token chips]** Filename token chips ({name} {ext} {n:02}) are custom-painted pill buttons rather than stock controls
+  - rule (charter): Charter: 'Custom views are for composing app-specific content, never for repainting OS chrome / button shapes.' Stock chips would be Button with .bordered/.borderedProminent and .controlSize(.small), inheriting system styling.
+  - fix: Render as Button('{name}') { ... }.buttonStyle(.bordered).controlSize(.small) so they inherit system corner radius, hover, and focus ring instead of a custom pill.
+  - test: both
+- **[Inspector / Config panel — Stepper rows (Expand/Contract)]** Mixed control idiom: feather/threshold use Slider, expand/contract use Stepper, inconsistent within one section
+  - rule (HIG): HIG (Controls / Consistency): use a consistent control type for analogous numeric inputs in the same group so users build one mental model. macOS pixel-amount adjustments are typically a single control type per group.
+  - fix: Pick one idiom for all four px controls in 'Mask refinement' (e.g. Slider + monospaced readout, or Stepper) so the section is internally consistent.
+  - test: source-scan
+- **[Inspector / Config panel — subtitle and footer text]** Developer-facing copy ('Filters (--filter chain)', 'used when text alone is empty') uses CLI/implementation jargon instead of plain user language
+  - rule (charter): Charter: 'No aspirational labels... every status string truthful and user-facing'; HIG (Writing): use clear, human language, not implementation details. The '--filter chain' flag and 'text alone is empty' are developer concepts.
+  - fix: Reword to user terms, e.g. drop the '--filter chain' flag reference and say 'Adjustments'; replace the footer with plain text describing precedence in user words, or remove it if the advanced field is hidden by default.
+  - test: source-scan
+- **[Toolbar]** Inspector toggle and Add Files use icon+title in toolbar but the Run/Stop button is title-only — inconsistent toolbar item presentation
+  - rule (HIG): HIG (macOS toolbars): keep toolbar items visually consistent; if items use symbols, all action items should carry a representative symbol so they read as a coherent set, and labels should be available consistently.
+  - fix: Give the process button a symbol (e.g. systemImage: viewModel.activeRun != nil ? "stop.fill" : "play.fill") so all three toolbar items are symbol+label consistent, or make all label-only.
+  - test: e2e-peekaboo
+- **[Toolbar]** Run all/Stop toggle uses a label swap with no distinct destructive/stop affordance
+  - rule (HIG): HIG (controls/feedback): a toggle that switches into a 'Stop' state should give clear visual feedback distinguishing the running state (e.g. a stop symbol or de-emphasized prominence); a plain text swap on a .borderedProminent button can re
+  - fix: When activeRun != nil, switch the button to systemImage "stop.fill" and consider .tint(.red) or a less-prominent style so the running/stop state is visually distinct from the idle Run all state.
+  - test: e2e-peekaboo
+- **[Toolbar]** Process toolbar button lacks a keyboard shortcut despite being the primary action
+  - rule (HIG): HIG (keyboard): the most important/primary action should be keyboard-reachable with a standard shortcut; Add Files… has ⌘O (via menu) but the primary process action has no shortcut.
+  - fix: Add .keyboardShortcut(.return, modifiers: .command) (or similar) to the process button and/or expose a Run All / Stop menu command in BgBgOneCommands so it is keyboard-reachable.
+  - test: source-scan
+- **[Missing-binary state]** brew-command 'code' chip is custom-painted with a hardcoded fill instead of a stock container
+  - rule (charter): Charter: 'Standard SwiftUI primitives only — no custom-painted OS chrome'; system materials for surfaces (CLAUDE.md:64-66, :28).
+  - fix: Use .background(.quaternary, in: .rect(cornerRadius:6)) or .regularMaterial; better, drop the brew chip entirely per the lying-label finding.
+  - test: source-scan
+- **[Missing-binary state]** Charter says MissingBinaryView 'disables actions' but the view's only stateful action (Retry) is always enabled with no disabled-state handling
+  - rule (charter): Charter NO FALLBACKS: 'the app shows MissingBinaryView and disables actions' (CLAUDE.md:49, :81).
+  - fix: This is correct only if the parent swaps the entire content area for MissingBinaryView (no toolbar process action reachable). Verify in WindowChrome/AppViewModel that toolbar 'Remove background' is .disabled while in missingBinary state; ad
+  - test: both
+- **[Missing-binary state]** Decorative glyph not hidden from VoiceOver and title is not exposed as a heading
+  - rule (a11y): HIG Accessibility: decorative images should be hidden from assistive tech; primary screen title should carry a heading trait for navigation.
+  - fix: Add .accessibilityHidden(true) to the decorative SF Symbol and .accessibilityAddTraits(.isHeader) to the title Text.
+  - test: source-scan
+- **[Window chrome (cross-cutting)]** Run all / Stop toolbar button uses no systemImage, breaking title-bar visual parity with the other toolbar items
+  - rule (charter): Charter "Finder eyeball test" + HIG Toolbars: toolbar items should present consistently (Finder's primary actions are labeled icon buttons). The other two items here use systemImage; this one is text-only prominent.
+  - fix: This is a deliberate primary-action prominence choice (matches design's "Remove background from N" prominent button) and is defensible; if parity is desired, add systemImage:"wand.and.stars"/"stop.fill". Keep .borderedProminent. Low severit
+  - test: source-scan
+- **[Window chrome (cross-cutting)]** Window title set twice (WindowGroup label + navigationTitle), risking redundant/inconsistent title-bar text
+  - rule (HIG): HIG Windows: "You typically display the title of a macOS window in the title bar" — one authoritative title. The charter wants real title text `bgbgone` in the real title bar.
+  - fix: Acceptable as-is (both resolve to "bgbgone"), but to remove the double source of truth, keep `.navigationTitle("bgbgone")` (it pairs with navigationSubtitle) and use a non-titling WindowGroup id, or document that the WindowGroup label only 
+  - test: source-scan
+- **[Window chrome (cross-cutting)]** navigationSubtitle blanked to empty string on first launch instead of conveying window state
+  - rule (HIG): HIG Windows: "Use the title area to describe the current screen if it provides useful context ... helps people confirm their location." The subtitle helper already computes a useful empty-state string but it is suppressed.
+  - fix: Either use `.navigationSubtitle(subtitle)` unconditionally (so first launch reads "Drop a folder to begin"), or delete the now-dead n==0 branch in `subtitle`. Pick one and make them consistent.
+  - test: source-scan
+- **[Window chrome (cross-cutting)]** DesignRadius.window = 14 (window corner radius) exists as a token that, if applied, would conflict with real NSWindow chrome
+  - rule (charter): Charter "NO FAKE CHROME": real NSWindow chrome only; the OS owns the window corner radius. A 14pt window radius is a custom-frame smell.
+  - fix: Remove DesignRadius.window (it has no legitimate use in a real-chrome app) or assert via source-scan that it is never used. Keep regular/small radii for in-content cards only.
+  - test: source-scan
+- **[Window chrome (cross-cutting)]** windowResizability(.contentMinSize) diverges from charter's documented .contentSize example
+  - rule (charter): Charter Tech baseline: "WindowGroup + .windowResizability(.contentSize)". HIG Windows: non-resizable windows feel broken on Mac — windows should be freely resizable.
+  - fix: Keep .contentMinSize (correct for a resizable Finder-like window). Reconcile the charter wording to allow .contentMinSize, OR confirm intent. No functional fix needed; flagged only as a documented-vs-actual drift.
+  - test: source-scan
+- **[Debug overlay (dev)]** Non-system typography: hardcoded point sizes and manual tracking imitating a type scale
+  - rule (charter): Charter: system fonts (.system/.headline/...) at system sizes; "never a hand-rolled tracking/weight stack pretending to be SF Pro." HIG (Typography): prefer Dynamic Type / semantic text styles.
+  - fix: Use semantic styles (`.caption`, `.caption2`, `.footnote`, `.body`) and drop manual `.tracking`. If kept DEBUG-only, lower priority. Source-scan test: no `.tracking(` and no raw `size:` font literals in shipping Views.
+  - test: source-scan
+- **[Dual preview / ORIGINAL & CUTOUT corner labels]** Corner caption contrast not guaranteed over arbitrary image / checkerboard
+  - rule (a11y): WCAG AA (4.5:1 for small text). A .thinMaterial capsule with semibold caption sits over the user's photo (ORIGINAL) and over the transparency checkerboard (CUTOUT); over light image content the translucent label can drop below AA.
+  - fix: Use `.regularMaterial` (more opaque) instead of `.thinMaterial`, set `.foregroundStyle(.primary)`, and add a hairline `.overlay(Capsule().strokeBorder(.separator))` so the label keeps AA contrast regardless of underlying pixels.
+  - test: e2e-peekaboo
+- **[Inspector / Config — vertical rhythm]** Mask-refinement rows use ad-hoc spacing (12/6/4 pt) unrelated to the DesignRadius scale
+  - rule (HIG): HIG (Layout & spacing): use a consistent spacing scale; charter implies tokenized geometry (DesignRadius 14/8/5). Mixed hard-coded paddings break visual rhythm.
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/Views/Settings/MaskFiltersForm.swift:12`
+  - fix: Introduce a DesignSpacing scale (or use Form/Section default spacing) and reference it instead of literals, or move these rows into a stock `Form { Section }` which supplies consistent system spacing.
+  - test: source-scan
+- **[Inspector / Config — Mask refinement labels]** Disclosure header uses .help tooltip but rows give no inline explanation of destructive/aggressive mask edits
+  - rule (heuristic): HIG (Controls / labels): controls that alter output should make their effect discoverable; charter "label clarity & truthfulness." Expand/Contract mask are dilation/erosion that can clip the subject, with no affordance signalling that.
+  - where: `/Users/arthurficial/dev/bgbgone-tree/bgbgone-app/Sources/Views/Settings/MaskFiltersForm.swift:20`
+  - fix: Add per-row `.help(...)` and a one-line secondary caption under each Toggle (Text(...).font(.footnote).foregroundStyle(.secondary)) so the effect is visible without hovering.
+  - test: e2e-peekaboo
