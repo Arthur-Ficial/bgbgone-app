@@ -47,9 +47,19 @@ struct BgBgOneRunner: BgBgOneRunning {
         let clock = ContinuousClock()
         let start = clock.now
 
+        // Set the instant cancellation is requested. The terminationHandler honors it
+        // regardless of how the (just-terminated) process happened to exit — a cancelled
+        // run must surface `.cancelled`, never a stale result or `malformedJSON` parsed
+        // from whatever the dying process left on stdout.
+        let cancelled = OSAllocatedUnfairLock(initialState: false)
+
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<RunResult, Error>) in
                 process.terminationHandler = { proc in
+                    if cancelled.withLock({ $0 }) {
+                        continuation.resume(throwing: RunnerError.cancelled)
+                        return
+                    }
                     let elapsed = clock.now - start
                     let stdoutData = (try? stdout.fileHandleForReading.readToEnd()) ?? Data()
                     let stderrData = (try? stderr.fileHandleForReading.readToEnd()) ?? Data()
@@ -96,7 +106,9 @@ struct BgBgOneRunner: BgBgOneRunning {
                 }
             }
         } onCancel: {
-            // Cooperatively terminate. The handler above maps the resulting exit code.
+            // Cooperatively terminate. The flag makes the handler report `.cancelled`
+            // regardless of the resulting exit code (avoids a cancel/exit race).
+            cancelled.withLock { $0 = true }
             if process.isRunning {
                 process.terminate()
             }
