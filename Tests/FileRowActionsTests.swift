@@ -74,10 +74,64 @@ struct FileRowActionsTests {
         #expect(kinds.contains(.revealCutout))
         #expect(kinds.contains(.openOriginal))
         #expect(kinds.contains(.openCutout))
+        #expect(kinds.contains(.saveCutout))
+        #expect(kinds.contains(.downloadZip))
         #expect(kinds.contains(.copyOriginalPath))
         #expect(kinds.contains(.copyCutoutPath))
         #expect(kinds.contains(.removeFromQueue))
-        #expect(kinds.count == 7)
+        #expect(kinds.count == 9)
+    }
+
+    @Test func saveCutoutLabelSingularAndPlural() {
+        let single = FileRowActions.actions(
+            for: [Self.makeFile()],
+            cutoutURL: { _ in Self.cutoutURL },
+            fileExists: { _ in true }
+        ).first { $0.kind == .saveCutout }
+        #expect(single?.label == "Save Cutout As…")
+
+        let multi = FileRowActions.actions(
+            for: [Self.makeFile(), Self.makeFile(URL(fileURLWithPath: "/tmp/in/b.jpg"))],
+            cutoutURL: { _ in Self.cutoutURL },
+            fileExists: { _ in true }
+        ).first { $0.kind == .saveCutout }
+        #expect(multi?.label == "Save 2 Cutouts…")
+    }
+
+    @Test func downloadZipLabelSingularAndPlural() {
+        let single = FileRowActions.actions(
+            for: [Self.makeFile()],
+            cutoutURL: { _ in Self.cutoutURL },
+            fileExists: { _ in true }
+        ).first { $0.kind == .downloadZip }
+        #expect(single?.label == "Download as ZIP…")
+
+        let multi = FileRowActions.actions(
+            for: [Self.makeFile(), Self.makeFile(URL(fileURLWithPath: "/tmp/in/b.jpg"))],
+            cutoutURL: { _ in Self.cutoutURL },
+            fileExists: { _ in true }
+        ).first { $0.kind == .downloadZip }
+        #expect(multi?.label == "Download 2 Cutouts as ZIP…")
+    }
+
+    @Test func saveCutoutAndZipDisabledWhenCutoutMissing() {
+        let actions = FileRowActions.actions(
+            for: [Self.makeFile()],
+            cutoutURL: { _ in Self.cutoutURL },
+            fileExists: { url in url != Self.cutoutURL }
+        )
+        #expect(actions.first { $0.kind == .saveCutout }?.isEnabled == false)
+        #expect(actions.first { $0.kind == .downloadZip }?.isEnabled == false)
+    }
+
+    @Test func saveCutoutAndZipEnabledWhenCutoutExists() {
+        let actions = FileRowActions.actions(
+            for: [Self.makeFile()],
+            cutoutURL: { _ in Self.cutoutURL },
+            fileExists: { _ in true }
+        )
+        #expect(actions.first { $0.kind == .saveCutout }?.isEnabled == true)
+        #expect(actions.first { $0.kind == .downloadZip }?.isEnabled == true)
     }
 
     @Test func removeFromQueueLabelShowsCount() {

@@ -12,6 +12,8 @@ enum FileRowActions {
         case revealCutout
         case openOriginal
         case openCutout
+        case saveCutout
+        case downloadZip
         case copyOriginalPath
         case copyCutoutPath
         case removeFromQueue
@@ -58,6 +60,18 @@ enum FileRowActions {
             ActionItem(
                 kind: .openCutout,
                 label: pluralize("Open", noun: "Cutout", suffix: nil, count: n),
+                isEnabled: cutoutsAllExist,
+                urls: cutouts
+            ),
+            ActionItem(
+                kind: .saveCutout,
+                label: n == 1 ? "Save Cutout As…" : "Save \(n) Cutouts…",
+                isEnabled: cutoutsAllExist,
+                urls: cutouts
+            ),
+            ActionItem(
+                kind: .downloadZip,
+                label: n == 1 ? "Download as ZIP…" : "Download \(n) Cutouts as ZIP…",
                 isEnabled: cutoutsAllExist,
                 urls: cutouts
             ),

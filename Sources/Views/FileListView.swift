@@ -202,7 +202,7 @@ struct FileListView: View {
 
             ForEach(actions) { action in
                 contextMenuButton(action, selection: selection)
-                if action.kind == .openCutout || action.kind == .copyCutoutPath {
+                if action.kind == .openCutout || action.kind == .downloadZip || action.kind == .copyCutoutPath {
                     Divider()
                 }
             }
@@ -229,6 +229,8 @@ struct FileListView: View {
         switch kind {
         case .revealOriginal, .revealCutout: "folder"
         case .openOriginal, .openCutout: "arrow.up.right.square"
+        case .saveCutout: "square.and.arrow.down"
+        case .downloadZip: "doc.zipper"
         case .copyOriginalPath, .copyCutoutPath: "doc.on.clipboard"
         case .removeFromQueue: "trash"
         }
@@ -244,6 +246,10 @@ struct FileListView: View {
             NSWorkspace.shared.activateFileViewerSelecting(action.urls)
         case .openOriginal, .openCutout:
             for url in action.urls { NSWorkspace.shared.open(url) }
+        case .saveCutout:
+            ExportPanels.save(action.urls)
+        case .downloadZip:
+            ExportPanels.downloadZip(action.urls)
         case .copyOriginalPath, .copyCutoutPath:
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(

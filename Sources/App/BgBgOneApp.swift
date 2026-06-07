@@ -288,6 +288,17 @@ private struct InspectorPane: View {
             .buttonStyle(.borderedProminent)
             .disabled(viewModel.activeRun != nil)
             .help("Re-process this image with the current settings — any state, any time")
+
+            Button {
+                ExportPanels.saveSingle(file.cutoutURL(in: file.config))
+            } label: {
+                Label("Download Cutout", systemImage: "square.and.arrow.down")
+            }
+            .buttonStyle(.bordered)
+            .disabled(!file.cutoutExists)
+            .help("Save the processed cutout to a location you choose")
+            .accessibilityIdentifier("inspector.downloadCutout")
+
             Spacer()
         }
         .padding(.horizontal, 12)
