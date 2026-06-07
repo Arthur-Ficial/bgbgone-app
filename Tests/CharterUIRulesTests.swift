@@ -60,5 +60,9 @@ struct CharterUIRulesTests {
                    "config.colour", "empty.tryDemo", "ctx.processThisOnly"] {
             #expect(code.contains("\"\(id)\""), "missing accessibilityIdentifier \"\(id)\"")
         }
+        // labelsHidden() pickers must still carry a VoiceOver label.
+        for label in ["\"Background\"", "\"Output format\"", "\"Algorithm\""] {
+            #expect(code.contains(".accessibilityLabel(\(label))"), "picker missing accessibilityLabel \(label)")
+        }
     }
 }

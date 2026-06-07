@@ -25,6 +25,7 @@ struct ConfigPanel: View {
                         .labelsHidden()
                         .fixedSize()
                         .accessibilityIdentifier("config.background")
+                        .accessibilityLabel("Background")
                         Spacer(minLength: 0)
                     }
 
@@ -59,6 +60,7 @@ struct ConfigPanel: View {
                     .labelsHidden()
                     .fixedSize()
                     .accessibilityIdentifier("config.format")
+                    .accessibilityLabel("Output format")
                     Spacer(minLength: 0)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -75,6 +77,7 @@ struct ConfigPanel: View {
                     .labelsHidden()
                     .fixedSize()
                     .accessibilityIdentifier("config.algorithm")
+                    .accessibilityLabel("Algorithm")
                     Spacer(minLength: 0)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
