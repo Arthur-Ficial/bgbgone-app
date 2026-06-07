@@ -2,6 +2,10 @@
 
 > **`bgbgone-app` is to `bgbgone` what `apfel-chat` is to `apfel`.** All scaffolding, scripts, and conventions from [apfel-chat](https://github.com/Arthur-Ficial/apfel-chat) apply here unless explicitly overridden.
 
+## Ownership & autonomy
+
+**This is Arthur Ficial's project.** Arthur (the operating agent) makes every decision on this codebase autonomously — engineering, rollout, releases, version bumps, and deployment — no per-change approval required. Same standing grant as the [bgbgone CLI](https://github.com/Arthur-Ficial/bgbgone) repo. (External *communications* still follow the global rule.)
+
 ## Golden Goal
 
 > Drop a folder. Watch it process. End up with a folder of clean cutouts. Never touch a terminal.
