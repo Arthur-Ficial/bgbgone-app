@@ -3,13 +3,13 @@
     <channel>
         <title>bgbgone-app</title>
         <item>
-            <title>0.3.2</title>
-            <pubDate>Sun, 07 Jun 2026 22:01:22 +0200</pubDate>
-            <sparkle:version>0.3.2</sparkle:version>
-            <sparkle:shortVersionString>0.3.2</sparkle:shortVersionString>
+            <title>0.3.3</title>
+            <pubDate>Sun, 07 Jun 2026 22:04:28 +0200</pubDate>
+            <sparkle:version>0.3.3</sparkle:version>
+            <sparkle:shortVersionString>0.3.3</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/Arthur-Ficial/bgbgone-app/releases/download/v0.3.2/bgbgone-app-v0.3.2-macos-arm64.zip" length="6508176" type="application/octet-stream" sparkle:edSignature="ZlIaaho4oXwi0iMD0iQCciT2hHEZJVyuVry9pf3g0tcbm8lnKvw3cK+1x5F8hXJQriKpq6z6IFx/dWCsNdPUCQ=="/>
+            <enclosure url="https://github.com/Arthur-Ficial/bgbgone-app/releases/download/v0.3.3/bgbgone-app-v0.3.3-macos-arm64.zip" length="6508178" type="application/octet-stream" sparkle:edSignature="Sn1MGVm47BBHb6R5Mg2ztbuueCU0bwBVr+ppntP+tWYDMY3gq9fXkKtKlm3vw2jR1zfLgbQcTfBbA9Sz1P+vDA=="/>
         </item>
     </channel>
 </rss>
