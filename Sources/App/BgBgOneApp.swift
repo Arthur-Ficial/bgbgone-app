@@ -18,6 +18,7 @@ struct BgBgOneApp: App {
         WindowGroup("bgbgone") {
             ContentView(viewModel: viewModel)
                 .frame(minWidth: 1100, idealWidth: 1180, minHeight: 720, idealHeight: 780)
+                .tint(.accentColor) // charter: inherit the user's chosen Mac accent, never a hardcoded blue
         }
         .windowResizability(.contentMinSize)
         .commands { BgBgOneCommands(viewModel: viewModel) }
@@ -89,7 +90,11 @@ struct ContentView: View {
     @Bindable var viewModel: AppViewModel
     @State private var isDropTargeted = false
     @State private var isInspectorPresented: Bool = false
+    #if DEBUG
     @State private var isDebugOpen: Bool = ProcessInfo.processInfo.arguments.contains("--debug")
+    #else
+    @State private var isDebugOpen: Bool = false // debug overlay is stripped from release builds
+    #endif
 
     var body: some View {
         Group {
@@ -103,6 +108,7 @@ struct ContentView: View {
                 mainWindow
             }
         }
+        #if DEBUG
         .overlay(alignment: .bottomTrailing) {
             if isDebugOpen {
                 DebugOverlay(viewModel: viewModel, log: DebugLog.shared) {
@@ -118,6 +124,7 @@ struct ContentView: View {
                 .opacity(0)
         }
         .animation(.easeOut(duration: 0.16), value: isDebugOpen)
+        #endif
         .onReceive(NotificationCenter.default.publisher(for: .bgbgoneAddFiles)) { _ in
             addFiles()
         }

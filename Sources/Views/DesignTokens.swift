@@ -6,9 +6,8 @@ import SwiftUI
 /// enough for visual parity. (A later pass via `scripts/colors-from-css.swift`
 /// can compute exact sRGB from the OKLCH literals.)
 enum DesignColor {
-    static let accent       = Color(red: 0/255,   green: 122/255, blue: 255/255) // #007aff
-    static let accentPress  = Color(red: 0/255,   green: 100/255, blue: 216/255) // #0064d8
-    static let accentSoft   = Color(red: 235/255, green: 244/255, blue: 255/255)
+    // Accent is the SYSTEM accent — applied via `.tint(.accentColor)` at the app root so
+    // every control inherits the user's chosen Mac accent (charter: never a hardcoded blue).
 
     static let bg           = Color(red: 252/255, green: 252/255, blue: 253/255)
     static let bgPane       = Color(red: 247/255, green: 247/255, blue: 249/255)

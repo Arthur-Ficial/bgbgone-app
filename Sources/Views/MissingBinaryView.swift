@@ -17,28 +17,11 @@ struct MissingBinaryView: View {
                 .font(DesignFont.displayName)
                 .foregroundStyle(DesignColor.fg)
 
-            Text("bgbgone-app is a thin wrapper around the bgbgone CLI. Install it via Homebrew:")
+            Text("The bgbgone engine that ships inside this app is missing or unreadable. Reinstalling bgbgone-app restores the bundled engine.")
                 .font(.system(size: 13))
                 .foregroundStyle(DesignColor.fgMute)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 440)
-
-            HStack(spacing: 8) {
-                Text("brew install Arthur-Ficial/tap/bgbgone")
-                    .font(.system(size: 12.5, design: .monospaced))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(DesignColor.bgSoft, in: RoundedRectangle(cornerRadius: 6))
-                Button("Copy") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString("brew install Arthur-Ficial/tap/bgbgone", forType: .string)
-                }
-                .buttonStyle(.bordered)
-            }
-
-            Text("Or build from source — see github.com/Arthur-Ficial/bgbgone")
-                .font(.system(size: 11.5))
-                .foregroundStyle(DesignColor.fgFaint)
 
             Button("Retry", action: onRetry)
                 .buttonStyle(.borderedProminent)

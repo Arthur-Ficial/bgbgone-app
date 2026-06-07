@@ -50,10 +50,10 @@ enum Algorithm: String, Sendable, Hashable, CaseIterable, Codable {
 
     var helpText: String {
         switch self {
-        case .auto: "Pick the best on-device algorithm (default)."
-        case .vnMask: "VNGenerateForegroundInstanceMaskRequest — macOS 14+."
-        case .person: "VNGeneratePersonSegmentationRequest — best for people."
-        case .saliency: "VNGenerateObjectnessBasedSaliencyImageRequest — heuristic."
+        case .auto: "Let bgbgone pick the best cutout method (default)."
+        case .vnMask: "General foreground/subject cutout — best all-rounder."
+        case .person: "Tuned for people and portraits."
+        case .saliency: "Heuristic: keeps the most visually prominent region."
         }
     }
 }

@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 
+#if DEBUG
 /// `--debug` Tweaks panel — the AI-driveable affordance from the design's
 /// `tweaks-panel.jsx`. Toggle with `cmd-` or with the `--debug` launch arg.
 ///
@@ -75,7 +76,7 @@ struct DebugOverlay: View {
                     if phase.isActive(viewModel) {
                         Image(systemName: "checkmark")
                             .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(DesignColor.accent)
+                            .foregroundStyle(Color.accentColor)
                     }
                 }
                 .font(.system(size: 11.5))
@@ -160,7 +161,7 @@ struct DebugOverlay: View {
                     ForEach(log.events) { event in
                         HStack(spacing: 4) {
                             Text("[\(event.category)]")
-                                .foregroundStyle(DesignColor.accent)
+                                .foregroundStyle(Color.accentColor)
                             Text(event.message)
                                 .foregroundStyle(DesignColor.fg)
                                 .lineLimit(1)
@@ -297,3 +298,4 @@ enum DemoPhase: String, CaseIterable {
         }
     }
 }
+#endif
