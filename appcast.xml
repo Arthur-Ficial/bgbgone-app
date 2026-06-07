@@ -1,0 +1,15 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>bgbgone-app</title>
+        <item>
+            <title>0.3.2</title>
+            <pubDate>Sun, 07 Jun 2026 22:01:22 +0200</pubDate>
+            <sparkle:version>0.3.2</sparkle:version>
+            <sparkle:shortVersionString>0.3.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/Arthur-Ficial/bgbgone-app/releases/download/v0.3.2/bgbgone-app-v0.3.2-macos-arm64.zip" length="6508176" type="application/octet-stream" sparkle:edSignature="ZlIaaho4oXwi0iMD0iQCciT2hHEZJVyuVry9pf3g0tcbm8lnKvw3cK+1x5F8hXJQriKpq6z6IFx/dWCsNdPUCQ=="/>
+        </item>
+    </channel>
+</rss>
