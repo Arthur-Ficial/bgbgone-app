@@ -287,9 +287,13 @@ final class AppViewModel {
            let modified = attrs[.modificationDate] as? Date {
             file.modifiedAt = modified
         }
-        // One syscall on ingest — never in a view body.
-        let cutout = file.cutoutURL(in: file.config)
-        file.cutoutExists = FileManager.default.fileExists(atPath: cutout.path)
+        // A freshly-ingested file is `.raw` ("Not removed") — it has no cutout from THIS
+        // session. We deliberately do NOT probe the disk here: a leftover file at the
+        // deterministic output path (e.g. a flipped cutout written by an older bgbgone
+        // build) must never be surfaced as if it were this run's result. `cutoutExists`
+        // flips to true only when a real run completes (`markFinished`). This honors the
+        // documented invariant on `ImageFile.cutoutExists` and the "no fake previews"
+        // charter — every pixel in the CUTOUT pane comes from a run we actually performed.
         return file
     }
 
