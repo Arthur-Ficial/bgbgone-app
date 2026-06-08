@@ -57,13 +57,31 @@ publish_appcast() {
     local gen; gen="$(resolve_generate_appcast)" || return 1
     local staging; staging="$(mktemp -d)"
     cp "$APP_ZIP" "$staging/"
-    # Versions/signatures come from the app bundle inside the zip. Feed the EdDSA private
-    # key from pass via stdin (--ed-key-file -) rather than the Keychain, which isn't
-    # reliably reachable from a non-interactive shell (errSecUserCanceled / -128).
-    pass show apple/bgbgone-sparkle-ed-private \
-        | "$gen" --ed-key-file - \
-            --download-url-prefix "https://github.com/Arthur-Ficial/${APP_NAME}/releases/download/${TAG}/" \
-            "$staging"
+
+    # The appcast MUST be signed with the EdDSA private key whose public half is
+    # the SUPublicEDKey baked into the shipped app — otherwise installed apps
+    # reject the update. Resolve the key without ever signing with a wrong one:
+    #   1. `pass` (canonical store) if available.
+    #   2. else the macOS Keychain, but ONLY if its public key matches the app.
+    # If neither yields the matching key, SKIP (non-fatal) — the GitHub Release is
+    # the source of truth for downloads; the appcast can be regenerated once the
+    # key is reachable. Never hard-fail the release for this, never sign blind.
+    local want_pub; want_pub="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$ROOT_DIR/Info.plist" 2>/dev/null || true)"
+    local url_prefix="--download-url-prefix https://github.com/Arthur-Ficial/${APP_NAME}/releases/download/${TAG}/"
+    if command -v pass >/dev/null 2>&1; then
+        pass show apple/bgbgone-sparkle-ed-private \
+            | "$gen" --ed-key-file - ${=url_prefix} "$staging"
+    else
+        local kc_pub; kc_pub="$("$SPARKLE_DIST/bin/generate_keys" -p 2>/dev/null | tail -1)"
+        if [[ -n "$want_pub" && "$kc_pub" == "$want_pub" ]]; then
+            "$gen" ${=url_prefix} "$staging"   # reads matching key from Keychain
+        else
+            print "WARNING: skipping appcast — no EdDSA key matching SUPublicEDKey (${want_pub})." >&2
+            print "         'pass' is unavailable and the Keychain key (${kc_pub}) does not match." >&2
+            print "         Website download is unaffected; regenerate the appcast where the key lives." >&2
+            rm -rf "$staging"; return 0
+        fi
+    fi
     local appcast="$staging/appcast.xml"
     [[ -f "$appcast" ]] || { print "ERROR: appcast.xml not generated" >&2; rm -rf "$staging"; return 1; }
 
