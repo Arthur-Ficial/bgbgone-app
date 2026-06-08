@@ -9,6 +9,16 @@
 #                them before committing to the actual release.
 set -euo pipefail
 
+# Pin the macOS SDK to its absolute path. Bare `xcrun --show-sdk-version` (used
+# by the bgbgone submodule's `make check-toolchain`) resolves the *default* SDK
+# via xcodebuild, which can break after a CommandLineTools/Xcode version skew
+# (e.g. the dangling /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk left by
+# an Xcode point update). An absolute SDKROOT fixes that AND is accepted by
+# SwiftPM (which rejects a bare name like "macosx" as a non-absolute path).
+if [[ -z "${SDKROOT:-}" || ! -d "${SDKROOT:-/nonexistent}" ]]; then
+    export SDKROOT="$(xcrun --sdk macosx --show-sdk-path 2>/dev/null)"
+fi
+
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_NAME="bgbgone-app"
 VERSION="$(tr -d '\n' < "$ROOT_DIR/.version")"
@@ -142,8 +152,20 @@ verify_fail() { print "    [FAIL] $1" >&2; FAIL=1; }
 FAIL=0
 
 print "==> Post-build verification"
+
+# AppleDouble gate: the published zip must contain ZERO ._* entries. Resource
+# forks / xattrs serialised as AppleDouble break an embedded framework's code
+# seal once Finder/Archive-Utility extracts them as literal files (this shipped
+# in v0.3.3). Assert here, on the actual artifact, before anything is published.
+DOTBAR_COUNT="$(unzip -l "$APP_ZIP" 2>/dev/null | grep -cE '/\._' || true)"
+[[ "$DOTBAR_COUNT" -eq 0 ]] \
+    && verify_pass "Zip is free of AppleDouble ._* entries" \
+    || verify_fail "Zip contains $DOTBAR_COUNT AppleDouble ._* entries — Gatekeeper will reject after Finder extraction"
+
+# Extract with `unzip`, NOT `ditto -x -k`: ditto silently merges ._* back into
+# xattrs, masking the exact defect real users hit. unzip mirrors Finder.
 EXTRACT_DIR="$(mktemp -d)"
-ditto -x -k "$APP_ZIP" "$EXTRACT_DIR"
+unzip -q "$APP_ZIP" -d "$EXTRACT_DIR"
 EXTRACTED_APP="$EXTRACT_DIR/${APP_NAME}.app"
 
 PLIST_VERSION="$(defaults read "$EXTRACTED_APP/Contents/Info.plist" CFBundleShortVersionString 2>/dev/null)"

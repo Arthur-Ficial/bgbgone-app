@@ -24,7 +24,15 @@ fi
 rm -rf "$DIST_DIR"
 mkdir -p "$DIST_DIR/homebrew"
 
-COPYFILE_DISABLE=1 ditto -c -k --keepParent "$APP_BUNDLE" "$APP_ZIP"
+# Strip resource forks / extended attributes / quarantine from the archive.
+# COPYFILE_DISABLE alone is NOT reliable for `ditto -c -k`: it still serialises
+# xattrs (e.g. com.apple.provenance, and Sparkle.framework's resource forks) as
+# AppleDouble ._* entries. Finder/Archive-Utility extraction then materialises
+# those ._* as literal files inside the embedded framework, breaking its code
+# seal → Gatekeeper rejects with "could not verify ... free of malware".
+# --norsrc --noextattr --noqtn produces a clean zip; the notarisation staple
+# survives because it lives in Contents/CodeResources (a real file, not an xattr).
+ditto -c -k --keepParent --norsrc --noextattr --noqtn "$APP_BUNDLE" "$APP_ZIP"
 cp "$APP_ZIP" "$APP_ZIP_STABLE"
 
 (
