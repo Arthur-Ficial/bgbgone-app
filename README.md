@@ -87,3 +87,7 @@ The design source-of-truth lives in [`design/`](design/) — open `design/projec
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Made by
+
+A project by **[Franz Enzenhofer](https://github.com/franzenzenhofer)** ([Full Stack Optimization](https://www.fullstackoptimization.com)), built by his AI assistant **[Arthur Ficial](https://github.com/Arthur-Ficial)**.
